@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 父工程：只负责依赖版本管理与模块聚合，不写业务代码（对应苍穹外卖的 sky-take-out） -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.16</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.asteria</groupId>
+    <artifactId>asteria</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>asteria</name>
+    <description>Asteria AI 刷题系统后端 · 父工程（聚合 asteria-common / asteria-pojo / asteria-server）</description>
+
+    <modules>
+        <module>asteria-common</module>
+        <module>asteria-pojo</module>
+        <module>asteria-server</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+</project>

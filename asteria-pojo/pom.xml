@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.asteria</groupId>
+        <artifactId>asteria</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>asteria-pojo</artifactId>
+    <name>asteria-pojo</name>
+    <description>模型模块：entity（表实体）/ dto（入参）/ vo（出参），只放数据类不放业务（对应 sky-pojo）</description>
+
+    <dependencies>
+        <!-- 实体注解 @TableName/@TableId/@TableField 来自 mybatis-plus-annotation -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-annotation</artifactId>
+            <version>3.5.15</version>
+        </dependency>
+        <!-- Lombok：@Data 自动生成 getter/setter（版本由 spring-boot 父 POM 管理） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: asteria-server
+  servlet:
+    multipart:
+      max-file-size: 20MB    # 单文件上限；Spring Boot 默认只有 1MB，不配就进不了校验代码
+      max-request-size: 25MB # 整个请求的上限，必须 ≥ max-file-size
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+asteria:
+  upload-dir: uploads # 上传文件的存盘目录（相对路径基于项目运行目录）

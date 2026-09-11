@@ -1,0 +1,49 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+# 上传文件存盘目录，不入库
+uploads/
+
+### 日志 ###
+*.log
+logs/
+
+### 系统文件 ###
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### 本地私有配置（如果你想某些配置只留本地，可以在这里加文件名）
+# application-local.yml
+# application-secret.yml
