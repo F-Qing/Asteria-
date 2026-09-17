@@ -61,12 +61,15 @@ public class BanksImportTransactional {
     /**
      * 一次导入的入库动作（事务方法）。
      *
-     * <p>顺序：插题库 → 插默认章节 → 逐题（判型/归一化/过滤/插入）→ 更新任务为 SUCCESS。
+     * <p>顺序：插题库 → 插默认章节 → 逐题（判型/归一化/过滤/插入）→ 更新任务状态。
      * 任何一步抛异常 → 整个事务回滚，不会留下"半截题库"。
+     *
+     * @param aiParse 是否还要做 AI 解析：true 时任务状态停在 AI_PROCESSING，
+     *                由后台的 AI 阶段跑完再收尾成 SUCCESS
      */
     @Transactional(rollbackFor = Exception.class)
     public Outcome saveImport(String taskId, String bankName, String originalFileName, String ext,
-                              List<RawQuestion> rawQuestions) throws JsonProcessingException {
+                              List<RawQuestion> rawQuestions, boolean aiParse) throws JsonProcessingException {
 
         // 1) 题库
         Bank bank = new Bank();
@@ -101,12 +104,11 @@ public class BanksImportTransactional {
                 continue;
             }
 
-            // 3.2 答案取不到 → 也跳过（否则会往 NOT NULL 的 answer 列插 NULL，整个批次报错）
+            // 3.2 【改】答案取不到不再跳过：answer 列是 NOT NULL，用空串占位，
+            //     缺答案的题照样入库，交给后台的 AI 阶段补答案（未开启 AI 时就一直是空串）
             String answer = answerNormalizer.normalize(rawQuestion, type);
-            if (answer == null || answer.isBlank()) {
-                skipped++;
-                skippedNos.add(no);
-                continue;
+            if (answer == null) {
+                answer = "";
             }
 
             // 3.3 组装并插入（注意：每题都 new 一个新对象，绝不复用同一个）
@@ -123,24 +125,30 @@ public class BanksImportTransactional {
 
         // 3.4 一道题都没入库 → 整体失败（抛异常让事务回滚，避免留下一个空题库）
         if (inserted == 0) {
-            throw new IllegalStateException("文件中没有可入库的题目（共 " + no + " 题，全部被跳过）");
+            // 两种情况的成因完全不同，提示要分开给，用户才知道该改什么：
+            //   no == 0 → 连题都没切出来，多半是缺【第 N 题】题号（没有题号整份文件都进不了切块）
+            //   no  > 0 → 切出来了但题型全判不出，多半是缺题型/缺答案
+            throw new IllegalStateException(no == 0
+                    ? "未识别到题目，请按标准格式整理：每道题以【第 N 题】开头，并写「题目：题干」（上传页可查看格式要求）"
+                    : "解析出 " + no + " 题但全部无法入库（题型无法识别），请按标准格式整理后重新上传（上传页可查看格式要求）");
         }
 
-        // 4) 任务收尾：必须放在所有题目插入【之后】，且和上面同一个事务
+        // 4) 任务收尾：必须放在所有题目插入【之后】，且和上面同一个事务。
+        //    【改】要 AI 解析就先别标 SUCCESS —— 否则前端轮询到 SUCCESS 就停止轮询、
+        //    刷新题库了，而 AI 还一道题都没跑。最终状态由后面的 AI 阶段收尾。
         bankImportMapper.updateById(BankImport.builder()
                 .taskId(taskId)
-                .status(ImportStatus.SUCCESS.name())
-                .progress(100)
+                .status(aiParse ? ImportStatus.AI_PROCESSING.name() : ImportStatus.SUCCESS.name())
+                .progress(aiParse ? 0 : 100)
                 .totalCount(inserted)
                 .bankId(bankId)
                 .build());
 
         if (skipped > 0) {
-            log.warn("taskId={} 跳过 {} 题（第 {} 题）：题型无法识别或答案缺失",
-                    taskId, skipped, skippedNos);
+            log.warn("taskId={} 跳过 {} 题（题型无法识别）：第 {} 题", taskId, skipped, skippedNos);
         }
-        log.info("入库完成：taskId={}, bankId={}, 入库{}题, 跳过{}题",
-                taskId, bankId, inserted, skipped);
+        log.info("入库完成：taskId={}, bankId={}, 入库{}题, 跳过{}题, aiParse={}",
+                taskId, bankId, inserted, skipped, aiParse);
 
         return new Outcome(bankId, inserted, skipped);
     }

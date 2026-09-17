@@ -67,6 +67,16 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
+          Spring AI：OpenAI 兼容协议的模型接入。
+          一套代码吃 OpenAI / DeepSeek / Moonshot / 通义 / 智谱 / 自建中转站（都能自定义 baseUrl）。
+          版本由父 POM 的 spring-ai-bom 管理（1.1.8，对应 Spring Boot 3.5）。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

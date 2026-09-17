@@ -57,7 +57,6 @@ public class QuestionsServiceImpl implements QuestionsService {
         Page<Question> pageParam = Page.of(current, size);
         questionsMapper.selectPage(pageParam, wrapper);
         List<Question> list = pageParam.getRecords();
-
         // ===== 第 2 步：章节名不在 question 表里 → 先查一次章节，建「章节id → 章节名」索引 =====
         // 只查一次，别在循环里查库（那样就是 N+1）
         Map<Long, String> chapterNames = new HashMap<>();

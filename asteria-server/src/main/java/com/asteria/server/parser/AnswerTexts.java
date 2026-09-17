@@ -3,22 +3,19 @@ package com.asteria.server.parser;
 import java.util.regex.Pattern;
 
 /**
- * 答案文本处理的小工具（包级私有，只有 {@code com.asteria.server.parser} 内部能用）。
+ * 选项字母处理的小工具（包级私有，只有 {@code com.asteria.server.parser} 内部能用）。
  *
  * <p>抽成单独的类是为了避免 QuestionClassifier 和 AnswerNormalizer
  * 各写一份正则——同一个规则只留一处，改的时候不会漏。
+ *
+ * <p>⚠️ 这里只管「字母」。判断题的对错词语义和 A/B 约定在
+ * {@link com.asteria.pojo.enums.TrueFalseAnswer} —— 那边还要给 AI 补答案和前端用，
+ * 不能关在这个包里。
  */
 final class AnswerTexts {
 
     /** 答案里的字母（半角、全角都认） */
     private static final Pattern LETTER = Pattern.compile("[A-Za-zＡ-Ｚａ-ｚ]");
-
-    /** 表示"正确"的词 */
-    private static final Pattern TRUE_WORD = Pattern.compile("(?i)^(?:对|正确|是|√|✓|T|TRUE)$");
-
-    /** 对错词全集（不在"正确"里的，都算"错误"） */
-    private static final Pattern TRUE_FALSE_WORD =
-            Pattern.compile("(?i)^(?:对|错|正确|错误|是|否|√|×|✓|✗|T|F|TRUE|FALSE)$");
 
     private AnswerTexts() {
     }
@@ -64,29 +61,5 @@ final class AnswerTexts {
             c = (char) (c - 'ａ' + 'a');
         }
         return String.valueOf(Character.toUpperCase(c));
-    }
-
-    /** 是不是对错词（对/错/正确/错误/√/×/T/F…） */
-    static boolean isTrueFalseWord(String text) {
-        return text != null && TRUE_FALSE_WORD.matcher(text.trim()).matches();
-    }
-
-    /**
-     * 对错词的语义：true = 正确，false = 错误，null = 不是对错词。
-     * <p>判断顺序很重要：先判"正确"，剩下的才当"错误"——
-     * 因为 TRUE_FALSE_WORD 里既有"对"也有"错"。
-     */
-    static Boolean trueFalseMeaning(String text) {
-        if (text == null) {
-            return null;
-        }
-        String s = text.trim();
-        if (TRUE_WORD.matcher(s).matches()) {
-            return Boolean.TRUE;
-        }
-        if (TRUE_FALSE_WORD.matcher(s).matches()) {
-            return Boolean.FALSE;
-        }
-        return null;
     }
 }

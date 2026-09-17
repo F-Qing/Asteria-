@@ -3,6 +3,7 @@ package com.asteria.server.parser;
 import com.asteria.common.Tool.QuestionOption;
 import com.asteria.common.Tool.RawQuestion;
 import com.asteria.pojo.enums.QuestionType;
+import com.asteria.pojo.enums.TrueFalseAnswer;
 
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -20,10 +21,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class AnswerNormalizer {
-
-    /** 前端判断题两张卡的固定约定：A = 正确、B = 错误 */
-    private static final String TRUE_KEY = "A";
-    private static final String FALSE_KEY = "B";
 
     /** 归一化；答案缺失时返回 null（调用方据此跳过该题并记入报告） */
     public String normalize(RawQuestion raw, QuestionType type) {
@@ -60,7 +57,7 @@ public class AnswerNormalizer {
         String rawAnswer = raw.getRawAnswer().trim();
 
         // 1) 原文本身是对错词（对/错/√/×/T/F…）
-        Boolean meaning = AnswerTexts.trueFalseMeaning(rawAnswer);
+        Boolean meaning = TrueFalseAnswer.meaningOf(rawAnswer);
 
         // 2) 原文是字母 → 查选项文本，再判语义
         if (meaning == null) {
@@ -68,13 +65,11 @@ public class AnswerNormalizer {
             if (letter == null) {
                 return null;
             }
-            meaning = AnswerTexts.trueFalseMeaning(findOptionText(raw.getRawOptions(), letter));
+            meaning = TrueFalseAnswer.meaningOf(findOptionText(raw.getRawOptions(), letter));
         }
 
-        if (meaning == null) {
-            return null;
-        }
-        return meaning ? TRUE_KEY : FALSE_KEY;
+        // 3) 语义 → 约定值 A/B（语义为 null 时返回 null，由调用方留空）
+        return TrueFalseAnswer.keyOfMeaning(meaning);
     }
 
     /** 按选项字母找出选项内容 */

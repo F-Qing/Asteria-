@@ -3,6 +3,7 @@ package com.asteria.server.parser;
 import com.asteria.common.Tool.QuestionOption;
 import com.asteria.common.Tool.RawQuestion;
 import com.asteria.pojo.enums.QuestionType;
+import com.asteria.pojo.enums.TrueFalseAnswer;
 
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -62,6 +63,6 @@ public class QuestionClassifier {
         if (options == null || options.size() != 2) {
             return false;
         }
-        return options.stream().allMatch(option -> AnswerTexts.isTrueFalseWord(option.getText()));
+        return options.stream().allMatch(option -> TrueFalseAnswer.isWord(option.getText()));
     }
 }

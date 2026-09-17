@@ -6,6 +6,18 @@ spring:
     active: dev
   application:
     name: asteria-server
+  ai:
+    model:
+      # 全部关掉：我们的 key / baseUrl / model 是每个请求从请求头取的，
+      # 不需要启动时按配置里的 api-key 建好的一堆单例 bean。
+      # 注意每种模型类型是独立的开关，漏关一个（比如语音合成）服务就起不来。
+      chat: none
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
   servlet:
     multipart:
       max-file-size: 20MB    # 单文件上限；Spring Boot 默认只有 1MB，不配就进不了校验代码

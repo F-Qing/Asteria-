@@ -6,6 +6,9 @@ import com.asteria.pojo.entity.VO.BankResultVO;
 import com.asteria.pojo.entity.VO.BanksVO;
 import com.asteria.pojo.entity.VO.PageResultVO;
 import com.asteria.server.Services.BanksService;
+import com.asteria.server.ai.AiHeaders;
+import com.asteria.server.ai.AiRequestConfig;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -40,14 +43,24 @@ public class BanksController {
         return ApiResponse.ok(detail);
     }
 
-    /** multipart 接收：file 必传，bankName 可选（缺省由前端取文件名） */
+    /**
+     * multipart 接收：file 必传，bankName 可选（缺省由前端取文件名），
+     * aiParse 可选（true = 入库后用 AI 逐题生成解析，缺答案的题顺带补答案）
+     */
     @PostMapping("/import")
     public ApiResponse<BanksVO> importBanks(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "bankName", required = false) String bankName) throws IOException {
-        log.info("收到上传：fileName={}, size={}B, bankName={}",
-                file.getOriginalFilename(), file.getSize(), bankName);
-        return ApiResponse.ok(banksService.importBanks(file, bankName));
+            @RequestParam(value = "bankName", required = false) String bankName,
+            @RequestParam(value = "aiParse", defaultValue = "false") boolean aiParse,
+            HttpServletRequest request) throws IOException {
+
+        // AI 配置从请求头取好再传给 Service（Service 不碰 HttpServletRequest，这是分层约定）。
+        // 勾了 AI 解析却没配置 AI → 直接抛 40020，别让用户以为解析过了。
+        AiRequestConfig aiConfig = aiParse ? AiHeaders.require(request) : null;
+
+        log.info("收到上传：fileName={}, size={}B, bankName={}, aiParse={}",
+                file.getOriginalFilename(), file.getSize(), bankName, aiParse);
+        return ApiResponse.ok(banksService.importBanks(file, bankName, aiConfig));
     }
 
     /** 查询导入任务进度：GET /api/banks/import/{taskId} */

@@ -7,6 +7,7 @@ import com.asteria.common.exception.BusinessException;
 import com.asteria.pojo.entity.Bank;
 import com.asteria.pojo.entity.BankImport;
 import com.asteria.pojo.entity.DTO.BankCountDTO;
+import com.asteria.pojo.entity.Question;
 import com.asteria.pojo.entity.VO.BankDetailVO;
 import com.asteria.pojo.entity.VO.BankResultVO;
 import com.asteria.pojo.entity.VO.BanksVO;
@@ -15,6 +16,8 @@ import com.asteria.pojo.entity.VO.PageResultVO;
 import com.asteria.pojo.enums.ImportStatus;
 import com.asteria.server.Services.BanksImportTransactional;
 import com.asteria.server.Services.BanksService;
+import com.asteria.server.ai.AiRequestConfig;
+import com.asteria.server.ai.QuestionAiEnricher;
 import com.asteria.server.mapper.BankMapper;
 import com.asteria.server.mapper.BanksImportMapper;
 import com.asteria.server.mapper.ChapterMapper;
@@ -78,6 +81,10 @@ public class BanksServiceImpl implements BanksService {
     @Autowired
     private ChapterMapper chapterMapper;
 
+    /** 单题 AI 解析器（内部自己造 ChatModel，这里不用管 key/baseUrl） */
+    @Autowired
+    private QuestionAiEnricher questionAiEnricher;
+
     /**
      * 上传入口：校验 → 存盘 → 登记任务 → 启动后台线程 → 立刻返回 taskId。
      *
@@ -85,7 +92,7 @@ public class BanksServiceImpl implements BanksService {
      * 而且必须先提交，后台线程才更新得到这条任务记录。
      */
     @Override
-    public BanksVO importBanks(MultipartFile file, String bankName) throws IOException {
+    public BanksVO importBanks(MultipartFile file, String bankName, AiRequestConfig aiConfig) throws IOException {
         // 1) 校验：空文件 / 扩展名 / 大小
         if (file == null || file.isEmpty()) {
             throw new BusinessException(40001, "请选择要上传的文件");
@@ -143,11 +150,12 @@ public class BanksServiceImpl implements BanksService {
                 .bankId(null)
                 .build());
 
-        log.info("导入任务已创建：taskId={}, fileName={}, bankName={}", taskId, originalName, bankName);
+        log.info("导入任务已创建：taskId={}, fileName={}, bankName={}, aiParse={}",
+                taskId, originalName, bankName, aiConfig != null);
 
-        // 6) 后台处理（解析 + 入库），主线程立刻返回
+        // 6) 后台处理（解析 + 入库 [+ AI 解析]），主线程立刻返回
         String finalBankName = bankName;
-        new Thread(() -> processImport(taskId, destFile, finalBankName, originalName, ext),
+        new Thread(() -> processImport(taskId, destFile, finalBankName, originalName, ext, aiConfig),
                 "import-" + taskId).start();
 
         BanksVO vo = new BanksVO();
@@ -162,7 +170,8 @@ public class BanksServiceImpl implements BanksService {
      * 后台线程的三段式：解析（事务外）→ 入库（事务内）→ 更新内存（事务外）。
      * 失败时：内存标 FAILED + 独立事务写数据库 + 删掉磁盘文件。
      */
-    private void processImport(String taskId, Path destFile, String bankName, String originalName, String ext) {
+    private void processImport(String taskId, Path destFile, String bankName, String originalName,
+                               String ext, AiRequestConfig aiConfig) {
         try {
             // ① 解析：读文件 + 切块 + 提取（纯计算，不碰数据库，所以放在事务外面）
             // 按文件类型选"取文本"的方式：docx 用 POI、pdf 用 PDFBox、txt 直接按编码读
@@ -172,6 +181,8 @@ public class BanksServiceImpl implements BanksService {
                 case "pdf" -> pdfTextReader.read(destFile);
                 default -> fileTextReader.read(destFile);
             };
+
+
             List<RawQuestion> rawQuestions = new QuestionParser().parse(content);
             log.info("文件解析完成：taskId={}, 共{}条原始题", taskId, rawQuestions.size());
 
@@ -182,10 +193,17 @@ public class BanksServiceImpl implements BanksService {
                 return v;
             });
             // ② 入库：题库 + 章节 + 题目 + 任务状态，同一个事务（跨 Bean 调用，事务才生效）
+            //    多传一个 aiParse：为 true 时任务状态会停在 AI_PROCESSING 而不是 SUCCESS
+            boolean aiParse = aiConfig != null;
             BanksImportTransactional.Outcome outcome =
-                    importTransactional.saveImport(taskId, bankName, originalName, ext, rawQuestions);
+                    importTransactional.saveImport(taskId, bankName, originalName, ext, rawQuestions, aiParse);
 
-            // ③ 内存状态：成功（内存不属于数据库事务，所以在事务外更新）
+            // ③ 【新增】AI 解析阶段：事务外、后台线程里逐题跑，进度写内存给前端轮询
+            if (aiParse) {
+                aiEnrich(taskId, outcome.bankId(), aiConfig);
+            }
+
+            // ④ 内存状态：成功（内存不属于数据库事务，所以在事务外更新；AI 跑完才到这里）
             importTasks.compute(taskId, (k, v) -> {
                 if (v != null) {
                     v.setStatus(ImportStatus.SUCCESS.name());
@@ -195,6 +213,18 @@ public class BanksServiceImpl implements BanksService {
                 }
                 return v;
             });
+
+            // ⑤ 【修】数据库也要一起收尾：AI 路径下 saveImport 写的是 AI_PROCESSING，
+            //    而内存里的最终状态不会自动落库 —— 不补这一笔，服务重启后 Message() 回落到
+            //    数据库就会永远显示"AI 解析中"。（非 AI 路径 saveImport 里已经写过 SUCCESS）
+            if (aiParse) {
+                bankImportMapper.updateById(BankImport.builder()
+                        .taskId(taskId)
+                        .status(ImportStatus.SUCCESS.name())
+                        .progress(100)
+                        .build());
+            }
+
             log.info("导入完成：taskId={}, bankId={}, 入库{}题, 跳过{}题",
                     taskId, outcome.bankId(), outcome.totalCount(), outcome.skippedCount());
 
@@ -222,6 +252,73 @@ public class BanksServiceImpl implements BanksService {
             // 清理落盘文件（文件系统不受事务保护，得手动删）
             deleteQuietly(destFile);
         }
+    }
+
+    // ========== AI 解析阶段 ==========
+
+    /**
+     * 把刚入库的题查出来，逐题补解析（原本缺答案的顺带补答案）。
+     *
+     * <p>进度 = 已处理题数 / 总题数 × 100：每题更新内存（前端 1.5s 轮询能看到它涨），
+     * 每 5 题落一次数据库（服务重启后 DB 兜底也有个大致进度）。
+     *
+     * <p>单题失败只记账不中断 —— 不能因为第 37 题超时就让前 36 题的解析白做。
+     */
+    private void aiEnrich(String taskId, Long bankId, AiRequestConfig aiConfig) {
+        List<Question> questions = questionMapper.selectList(
+                Wrappers.<Question>lambdaQuery().eq(Question::getBankId, bankId));
+        int total = questions.size();
+        log.info("AI 解析开始：taskId={}, bankId={}, 共{}题", taskId, bankId, total);
+
+        updateTask(taskId, ImportStatus.AI_PROCESSING.name(), 0, total, bankId);
+
+        int done = 0;
+        int failed = 0;
+        for (Question question : questions) {
+            try {
+                QuestionAiEnricher.EnrichResult result = questionAiEnricher.enrich(question, aiConfig);
+
+                Question patch = new Question();
+                patch.setId(question.getId());
+                patch.setAnalysis(result.analysis());
+                if (result.answer() != null) {        // null = 这题原本有答案，不动它
+                    patch.setAnswer(result.answer());
+                }
+                questionMapper.updateById(patch);     // 只更新非 null 字段
+
+            } catch (Exception e) {
+                failed++;
+                log.warn("AI 解析失败（第 {} 题）：questionId={}, 原因={}",
+                        done + 1, question.getId(), e.getClass().getSimpleName() + ": " + e.getMessage());
+            }
+
+            done++;
+            int progress = (int) (done * 100L / total);
+            updateTask(taskId, ImportStatus.AI_PROCESSING.name(), progress, total, bankId);
+
+            if (done % 5 == 0 || done == total) {
+                bankImportMapper.updateById(BankImport.builder()
+                        .taskId(taskId)
+                        .progress(progress)
+                        .build());
+            }
+        }
+
+        // 失败题数只记日志：前端 SUCCESS 卡片不展示 errorMessage，写进去用户也看不见
+        log.info("AI 解析结束：taskId={}, 成功{}题, 失败{}题", taskId, total - failed, failed);
+    }
+
+    /** 更新内存里的任务快照（前端轮询读的就是它） */
+    private void updateTask(String taskId, String status, int progress, int total, Long bankId) {
+        importTasks.compute(taskId, (k, v) -> {
+            if (v != null) {
+                v.setStatus(status);
+                v.setProgress(progress);
+                v.setTotalCount(total);
+                v.setBankId(bankId);
+            }
+            return v;
+        });
     }
 
     // ========== 查询接口 ==========

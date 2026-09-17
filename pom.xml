@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 父工程：只负责依赖版本管理与模块聚合，不写业务代码（对应苍穹外卖的 sky-take-out） -->
+    <!-- 父工程：只负责依赖版本管理与模块聚合，不写业务代码） -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -27,5 +27,20 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Spring AI：1.1.x 对应 Spring Boot 3.5（2.0.x 是给 Boot 4 的，不能用） -->
+        <spring-ai.version>1.1.8</spring-ai.version>
     </properties>
+
+    <!-- 只做版本管理，不真正引入依赖；子模块用的时候不用写版本号 -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>
