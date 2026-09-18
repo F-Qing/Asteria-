@@ -27,10 +27,10 @@
       </div>
     </aside>
 
-    <!-- ── 聊天主区 ── -->
-    <section class="chat-main glass">
-      <div ref="msgListRef" class="message-list">
-        <template v-if="chatStore.activeSessionId != null">
+    <!-- ── 聊天主区：仅在已打开会话时升起 ── -->
+    <Transition name="chat-rise" mode="out-in">
+      <section v-if="chatStore.activeSessionId != null" class="chat-main glass">
+        <div ref="msgListRef" class="message-list">
           <TransitionGroup name="list">
             <ChatMessageItem
               v-for="(m, i) in chatStore.activeMessages"
@@ -50,14 +50,22 @@
             text="开始提问吧"
             hint="AI 会结合你的题库内容回答"
           />
-        </template>
-        <EmptyState v-else :icon="Cloud" text="选择或新建一个会话" hint="左侧管理你的 AI 学习会话" />
-      </div>
+        </div>
 
-      <div class="input-area">
-        <ChatInputBox :streaming="chatStore.streaming" :disabled="chatStore.activeSessionId == null" @send="onSend" @stop="onStop" />
+        <div class="input-area">
+          <ChatInputBox :streaming="chatStore.streaming" @send="onSend" @stop="onStop" />
+        </div>
+      </section>
+
+      <!-- 无会话时的轻量引导：无边框面板，只有一枚漂浮提示 -->
+      <div v-else class="chat-placeholder">
+        <EmptyState
+          :icon="Cloud"
+          text="点击左侧 + 新建会话"
+          hint="或从会话列表中选择，开启你的 AI 学习对话"
+        />
       </div>
-    </section>
+    </Transition>
   </div>
 </template>
 
@@ -294,6 +302,44 @@ function onStop() {
 }
 .input-area {
   padding: 0 var(--space-5) var(--space-5);
+}
+
+/* ── 无会话占位引导 ── */
+.chat-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* ── 聊天栏升起过渡 ── */
+.chat-rise-enter-active {
+  transition:
+    opacity var(--duration-slow) var(--ease-out),
+    transform var(--duration-slow) var(--ease-spring);
+}
+.chat-rise-leave-active {
+  transition:
+    opacity var(--duration-fast) ease,
+    transform var(--duration-normal) var(--ease-standard);
+}
+.chat-rise-enter-from {
+  opacity: 0;
+  transform: translateY(36px) scale(0.98);
+}
+.chat-rise-leave-to {
+  opacity: 0;
+  transform: translateY(14px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-rise-enter-active,
+  .chat-rise-leave-active {
+    transition: opacity var(--duration-normal) ease;
+  }
+  .chat-rise-enter-from,
+  .chat-rise-leave-to {
+    transform: none;
+  }
 }
 
 @media (max-width: 900px) {
