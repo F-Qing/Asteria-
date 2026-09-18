@@ -95,7 +95,13 @@ asteria/                     父工程：只做依赖版本管理与模块聚合
 mysql -uroot -p -e "CREATE DATABASE finaltext DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"
 ```
 
-按顺序执行 `asteria-server/src/main/resources/db/` 下的 4 个脚本（都是可重复执行的）：
+按顺序执行 `asteria-server/src/main/resources/db/` 下的 5 个脚本（都带 `USE finaltext;`，且可重复执行）：
+
+```bash
+cd asteria-server/src/main/resources/db
+mysql -uroot -p < bank_tables.sql
+# ...其余脚本同理
+```
 
 | 顺序 | 脚本 | 内容 |
 |---|---|---|
@@ -103,15 +109,28 @@ mysql -uroot -p -e "CREATE DATABASE finaltext DEFAULT CHARACTER SET utf8mb4 COLL
 | 2 | `practice_tables.sql` | 刷题会话、答题记录、错题本 |
 | 3 | `knowledge_summary.sql` | 知识点总结缓存 |
 | 4 | `chat_tables.sql` | `chat_session` / `chat_message` |
+| 5 | `textdatetime.sql` | 考试信息表 |
 
 ### 2. 配置数据库
 
-`application.yml` 默认激活 `dev` profile，数据库账号密码从环境变量读：
+`application.yml` 默认激活 `dev` profile，数据库账号密码从环境变量读，不设置则使用默认值 root / 123456：
 
 ```bash
-# 不设置则使用默认值 root / 123456
+# Linux / macOS（bash）
 export DB_USER=root
 export DB_PASSWORD=你的密码
+```
+
+```powershell
+# Windows PowerShell
+$env:DB_USER = "root"
+$env:DB_PASSWORD = "你的密码"
+```
+
+```bat
+:: Windows cmd
+set DB_USER=root
+set DB_PASSWORD=你的密码
 ```
 
 也可以直接改 `asteria-server/src/main/resources/application-dev.yml`。
@@ -131,12 +150,15 @@ java -jar asteria-server/target/asteria-server-0.0.1-SNAPSHOT.jar
 ### 4. 前端
 
 前端源码在 `asteria-ai/`，`asteria-ai/dist` 是已经构建好的静态产物（**已随仓库提交，可直接部署**）。
-两种用法：
+三种用法：
 
-**方式 A：单独托管（开发时）**——用任意静态服务器（nginx / `npx serve`）托管 `dist`，
+**方式 A：开发热更新（改前端时最方便）**——在 `asteria-ai/` 下执行 `npm install && npm run dev`，
+访问 `http://localhost:5173`；Vite 已配好把 `/api` 代理到 `http://localhost:8080`，后端照常以 jar 或 IDEA 方式运行即可。
+
+**方式 B：单独托管静态产物**——用任意静态服务器（nginx / `npx serve`）托管 `dist`，
 把 `/api` 反向代理到 `http://localhost:8080`。
 
-**方式 B：一个 jar 自带前端（打包分发时推荐）**——`asteria-server/pom.xml` 里已经配好
+**方式 C：一个 jar 自带前端（打包分发时推荐）**——`asteria-server/pom.xml` 里已经配好
 `maven-resources-plugin`，打包时会把 `asteria-ai/dist` 拷进 jar 的 `static/` 目录，
 启动后直接访问 `http://localhost:8080` 就是完整界面，不需要 nginx。
 
