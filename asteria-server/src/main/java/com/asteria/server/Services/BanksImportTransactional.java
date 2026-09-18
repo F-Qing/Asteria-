@@ -21,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 导入的「入库」环节：题库 + 章节 + 题目 + 任务状态，全部在**一个事务**里。
@@ -38,6 +40,9 @@ public class BanksImportTransactional {
 
     /** error_message 列宽上限（varchar(500)） */
     private static final int MAX_ERROR_LENGTH = 500;
+
+    /** 题目没有章节信息时，统一归到这一章 */
+    private static final String DEFAULT_CHAPTER_NAME = "默认章节";
 
     @Autowired
     private BankMapper bankMapper;
@@ -61,7 +66,7 @@ public class BanksImportTransactional {
     /**
      * 一次导入的入库动作（事务方法）。
      *
-     * <p>顺序：插题库 → 插默认章节 → 逐题（判型/归一化/过滤/插入）→ 更新任务状态。
+     * <p>顺序：插题库 → 按题目的章节名建章节 → 逐题（判型/归一化/过滤/插入）→ 更新任务状态。
      * 任何一步抛异常 → 整个事务回滚，不会留下"半截题库"。
      *
      * @param aiParse 是否还要做 AI 解析：true 时任务状态停在 AI_PROCESSING，
@@ -79,13 +84,22 @@ public class BanksImportTransactional {
         bankMapper.insert(bank);
         Long bankId = bank.getId();
 
-        // 2) 默认章节（文件里没有章节信息时，所有题都挂这一章）
-        Chapter chapter = new Chapter();
-        chapter.setBankId(bankId);
-        chapter.setName("默认章节");
-        chapter.setSort(1);
-        chapterMapper.insert(chapter);
-        Long chapterId = chapter.getId();
+        // 2) 章节：按题目里带的章节名分组建。
+        //    没带章节名的题（原文没有章节标题，或题目出现在所有章节标题之前）统一归到「默认章节」。
+        //    用 LinkedHashMap：章节按"首次出现的顺序"排，正好就是 sort 的顺序。
+        Map<String, Long> chapterIds = new LinkedHashMap<>();
+        for (RawQuestion rawQuestion : rawQuestions) {
+            String name = chapterNameOf(rawQuestion);
+            chapterIds.computeIfAbsent(name, n -> {
+                Chapter c = new Chapter();
+                c.setBankId(bankId);
+                c.setName(n);
+                c.setSort(chapterIds.size() + 1);
+                chapterMapper.insert(c);
+                return c.getId();
+            });
+        }
+        log.info("章节划分：taskId={}, 共 {} 章，{}", taskId, chapterIds.size(), chapterIds.keySet());
 
         // 3) 逐题：判型 → 归一化 → 过滤 → 插入
         int no = 0;
@@ -114,7 +128,7 @@ public class BanksImportTransactional {
             // 3.3 组装并插入（注意：每题都 new 一个新对象，绝不复用同一个）
             Question question = new Question();
             question.setBankId(bankId);
-            question.setChapterId(chapterId);
+            question.setChapterId(chapterIds.get(chapterNameOf(rawQuestion)));
             question.setType(type.name());
             question.setStem(rawQuestion.getRawStem());
             question.setOptions(objectMapper.writeValueAsString(rawQuestion.getRawOptions()));
@@ -174,5 +188,16 @@ public class BanksImportTransactional {
             return null;
         }
         return text.length() > MAX_ERROR_LENGTH ? text.substring(0, MAX_ERROR_LENGTH) : text;
+    }
+
+    /**
+     * 这道题该归到哪一章。
+     *
+     * <p>章节名首尾空白要裁掉：同一个章节名在多个分块里出现时，裁掉后才合并得起来
+     * （否则「第一章」和「第一章 」会变成两章）。
+     */
+    private String chapterNameOf(RawQuestion rawQuestion) {
+        String name = rawQuestion.getChapterName();
+        return (name == null || name.isBlank()) ? DEFAULT_CHAPTER_NAME : name.trim();
     }
 }

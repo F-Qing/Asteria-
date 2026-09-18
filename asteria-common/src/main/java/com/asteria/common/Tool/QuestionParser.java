@@ -9,6 +9,26 @@ public class QuestionParser {
     public static final Pattern QUESTION_HEADER =
             Pattern.compile("^\\s*【\\s*第\\s*\\d+\\s*题\\s*】|^\\s*\\d+\\s*[、.．]\\s*\\S");
 
+    /**
+     * 章节标题行（AI 整理后的标准写法）：<b>【第 1 章】计算机网络概述</b>
+     *
+     * <p>方括号 + 明确带「章」字，和题号行（带「题」字）在正则上完全不冲突。
+     */
+    public static final Pattern CHAPTER_HEADER =
+            Pattern.compile("^\\s*[【\\[]\\s*第\\s*[0-9一二三四五六七八九十百零]+\\s*章\\s*[】\\]]\\s*(.*)$");
+
+    /**
+     * 章节标题行（原始文件里的裸写法）：<b>第一章 绪论</b> / <b>第1章：绪论</b>
+     *
+     * <p>注意它是"弱特征"：句子「第一章讲了什么？」也能匹配上后半段，
+     * 所以 {@link #matchChapter} 里加了长度和标点两重限制，避免把题干当成章节标题吞掉。
+     */
+    private static final Pattern CHAPTER_HEADER_BARE =
+            Pattern.compile("^\\s*第\\s*[0-9一二三四五六七八九十百零]+\\s*章\\s*[:：、.．]?\\s*(\\S.*)$");
+
+    /** 裸章节标题行的最大长度：超过这个长度就当成正文，不当标题 */
+    private static final int BARE_CHAPTER_MAX_LENGTH = 30;
+
     /** 题型：xxx（常和题号写在同一行） */
     private static final Pattern TYPE_PATTERN =
             Pattern.compile("题型[：:]\\s*(\\S+)");
@@ -72,18 +92,33 @@ public class QuestionParser {
         List<RawQuestion> questions = new ArrayList<>();   // 已收好的题（结果）
         List<String> block = new ArrayList<>();            // 手里的夹子（当前这一道题）
         int blockStartLine = 0;                            // 当前题从第几行开始；0 = 还没进入题目区
+        String currentChapter = null;                      // 最近一个章节标题；null = 还没遇到章节
 
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
+
+            // ① 章节标题行：切换"当前章节"，这行本身不进题目块、也不记可疑
+            String chapterTitle = matchChapter(line);
+            if (chapterTitle != null) {
+                // 手里还夹着题 → 它属于【上一个】章节，先交出去再换章节
+                if (!block.isEmpty()) {
+                    questions.add(buildQuestion(block, blockStartLine, currentChapter));
+                    block.clear();
+                    blockStartLine = 0;
+                }
+                currentChapter = chapterTitle.isEmpty() ? null : chapterTitle;
+                continue;
+            }
+
             boolean isHeader = QUESTION_HEADER.matcher(line).find();
 
             if (isHeader) {
-                // ① 手里还有上一道题 → 先交出去
+                // ② 手里还有上一道题 → 先交出去
                 if (!block.isEmpty()) {
-                    questions.add(buildQuestion(block, blockStartLine));
+                    questions.add(buildQuestion(block, blockStartLine, currentChapter));
                     block.clear();                          // 腾空夹子
                 }
-                // ② 记住新这道题从第几行开始（行号从 1 开始）
+                // 记住新这道题从第几行开始（行号从 1 开始）
                 blockStartLine = i + 1;
             }
 
@@ -95,13 +130,40 @@ public class QuestionParser {
 
         // ④ 循环结束后，最后一道题还在夹子里，补收一次
         if (!block.isEmpty()) {
-            questions.add(buildQuestion(block, blockStartLine));
+            questions.add(buildQuestion(block, blockStartLine, currentChapter));
         }
         return questions;
     }
 
+    /**
+     * 这一行是不是章节标题行。
+     *
+     * @return 不是章节行 → <b>null</b>；是章节行 → 章节名（可能是空串，表示标题只有「第 N 章」没有文字）
+     */
+    private String matchChapter(String line) {
+        if (line == null || line.isBlank()) {
+            return null;
+        }
+        // 强特征：带方括号的【第 N 章】，无脑认
+        var bracketed = CHAPTER_HEADER.matcher(line);
+        if (bracketed.matches()) {
+            return bracketed.group(1).trim();
+        }
+
+        // 弱特征：裸写的"第一章 绪论"。加两重限制，否则题干会被吞掉：
+        //   ① 整行不能太长（标题不会是一整句话）
+        //   ② 不能带句末标点（带问号的多半是题干）
+        String text = line.trim();
+        if (text.length() > BARE_CHAPTER_MAX_LENGTH
+                || text.contains("。") || text.contains("？") || text.contains("！") || text.contains("?")) {
+            return null;
+        }
+        var bare = CHAPTER_HEADER_BARE.matcher(text);
+        return bare.matches() ? bare.group(1).trim() : null;
+    }
+
     /** 把"一道题的所有行"提取成 RawQuestion（阶段一：只取原始材料，不判型、不归一化答案） */
-    private RawQuestion buildQuestion(List<String> block, int startLine) {
+    private RawQuestion buildQuestion(List<String> block, int startLine, String chapterName) {
         String rawType = null;
         String rawStem = null;
         List<QuestionOption> rawOptions = new ArrayList<>();
@@ -180,7 +242,7 @@ public class QuestionParser {
             suspicious.add(line);
         }
 
-        return new RawQuestion(rawType, rawStem, rawOptions, rawAnswer, startLine, suspicious);
+        return new RawQuestion(rawType, rawStem, rawOptions, rawAnswer, chapterName, startLine, suspicious);
     }
 
     /** 是不是"裸答案行"：整行只有对错词，或整行只有本题选项里的字母 */
