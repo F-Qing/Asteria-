@@ -6,6 +6,9 @@
 在此之上提供刷题、错题本、知识点总结，以及一个**能自己去查题库**的 AI 答疑助手（工具调用）。
 
 > 前端（Vue 3 + Vite）源码与打包产物在 [`asteria-ai/`](./asteria-ai)，其中 `asteria-ai/dist` 是可直接部署的构建结果。
+>
+> 题库素材的来源整理，配套有一个独立的个人学习辅助工具 —— [**ChaoxingQuizTool**](https://github.com/F-Qing/ChaoxingQuizTool)：
+> 把你自己账号下可查看的题库页面整理成本系统支持导入的结构化文本（仅供个人学习资料整理使用）。
 
 ---
 
