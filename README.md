@@ -95,7 +95,7 @@ asteria/                     父工程：只做依赖版本管理与模块聚合
 mysql -uroot -p -e "CREATE DATABASE finaltext DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"
 ```
 
-按顺序执行 `asteria-server/src/main/resources/db/` 下的 5 个脚本（都带 `USE finaltext;`，且可重复执行）：
+按顺序执行 `asteria-server/src/main/resources/db/` 下的 6 个脚本（都带 `USE finaltext;`，且可重复执行）：
 
 ```bash
 cd asteria-server/src/main/resources/db
@@ -106,10 +106,11 @@ mysql -uroot -p < bank_tables.sql
 | 顺序 | 脚本 | 内容 |
 |---|---|---|
 | 1 | `bank_tables.sql` | `bank` / `chapter` / `question` |
-| 2 | `practice_tables.sql` | 刷题会话、答题记录、错题本 |
-| 3 | `knowledge_summary.sql` | 知识点总结缓存 |
-| 4 | `chat_tables.sql` | `chat_session` / `chat_message` |
-| 5 | `textdatetime.sql` | 考试信息表 |
+| 2 | `import_task.sql` | `import_task`（题库导入任务，进度与失败原因） |
+| 3 | `practice_tables.sql` | 刷题会话、答题记录、错题本 |
+| 4 | `knowledge_summary.sql` | 知识点总结缓存 |
+| 5 | `chat_tables.sql` | `chat_session` / `chat_message` |
+| 6 | `textdatetime.sql` | 考试信息表 |
 
 ### 2. 配置数据库
 
@@ -296,6 +297,7 @@ event: error    data: {"code":50000,"message":"..."}        // 出错（信息�
 表结构都在 `asteria-server/src/main/resources/db/` 里，关键关系：
 
 ```
+import_task ──> bank                     （成功导入的任务指向产出的题库；删题库时任务记录保留，故不建外键）
 bank ──< chapter ──< question
   └──────────────────< question          （question.bank_id 是冗余列，便于按题库直接筛题）
 
