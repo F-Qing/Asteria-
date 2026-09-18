@@ -1,4 +1,4 @@
-import{c as l,_ as d}from"./index-CK2hOMv3.js";import{G as i,M as o,S as c,O as n,u as r,Y as f,Z as s,Q as u,L as t}from"./vendor-BtDxEGf_.js";/**
+import{c as l,_ as d}from"./index-BvpK7EKB.js";import{G as i,M as o,S as c,O as n,u as r,Y as f,Z as s,Q as u,L as t}from"./vendor-BtDxEGf_.js";/**
  * @license lucide-vue-next v1.0.0 - ISC
  *
  * This source code is licensed under the ISC license.
