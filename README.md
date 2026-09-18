@@ -130,8 +130,27 @@ java -jar asteria-server/target/asteria-server-0.0.1-SNAPSHOT.jar
 
 ### 4. 前端
 
-前端源码在 `asteria-ai/`，`asteria-ai/dist` 是已经构建好的静态产物，用任意静态服务器
-（nginx / `npx serve`）托管即可，记得把 `/api` 反向代理到 `http://localhost:8080`。
+前端源码在 `asteria-ai/`，`asteria-ai/dist` 是已经构建好的静态产物（**已随仓库提交，可直接部署**）。
+两种用法：
+
+**方式 A：单独托管（开发时）**——用任意静态服务器（nginx / `npx serve`）托管 `dist`，
+把 `/api` 反向代理到 `http://localhost:8080`。
+
+**方式 B：一个 jar 自带前端（打包分发时推荐）**——`asteria-server/pom.xml` 里已经配好
+`maven-resources-plugin`，打包时会把 `asteria-ai/dist` 拷进 jar 的 `static/` 目录，
+启动后直接访问 `http://localhost:8080` 就是完整界面，不需要 nginx。
+
+```bash
+# 前端源码改过时，必须先重新构建（产物在 asteria-ai/dist）
+cd asteria-ai && npm install && npm run build
+
+# 再打包后端 —— 注意必须带 clean！
+# 否则 target/classes/static 里会残留上一次构建的旧前端文件，一起进 jar
+cd .. && mvn clean package -DskipTests
+```
+
+> ⚠️ `mvn package` 前一定要 `clean`。`copy-resources` 只覆盖同名文件，不会删除
+> `target/classes/static` 里上一次留下的旧 chunk，结果就是 jar 里塞了两份前端。
 
 ---
 
