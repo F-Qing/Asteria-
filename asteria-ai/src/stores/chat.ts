@@ -58,6 +58,10 @@ export const useChatStore = defineStore('chat', {
       if (this.activeSessionId === id) this.activeSessionId = null
     },
     async openSession(id: number) {
+      // 0 / NaN / 负数都不是合法会话 id，直接忽略。
+      // 不加这道防御的话，任何调用方手滑传 0（比如路由可选参数缺省时 Number('') === 0），
+      // 都会发一个查不到的请求，用户白挨一条后端错误提示。
+      if (!Number.isInteger(id) || id <= 0) return
       this.activeSessionId = id
       if (this.messages[id]) return
       try {

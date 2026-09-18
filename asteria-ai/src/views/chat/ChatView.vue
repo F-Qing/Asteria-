@@ -93,9 +93,16 @@ let currentConn: SseConnection | null = null
 onMounted(async () => {
   await chatStore.fetchSessions()
 
-  const sid = Number(route.params.sessionId)
-  if (Number.isFinite(sid)) {
-    await chatStore.openSession(sid)
+  // 路由是 chat/:sessionId?（可选参数）。从侧边栏进 /chat 时没有 sessionId，
+  // vue-router 给的是空字符串 ''，而 Number('') === 0、Number.isFinite(0) === true，
+  // 会被当成合法 id 去查会话 0 → 后端返回 40404，用户一进页面就看到红条。
+  const raw = route.params.sessionId
+  const text = Array.isArray(raw) ? raw[0] : raw
+  if (text != null && text !== '') {
+    const sid = Number(text)
+    if (Number.isInteger(sid) && sid > 0) {
+      await chatStore.openSession(sid)
+    }
   }
   scrollToBottom()
 })

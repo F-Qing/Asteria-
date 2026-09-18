@@ -44,6 +44,21 @@ logs/
 Thumbs.db
 desktop.ini
 
-### 本地私有配置（如果你想某些配置只留本地，可以在这里加文件名）
-# application-local.yml
-# application-secret.yml
+### 本地私有配置（含数据库密码 / AI Key，绝不入库）
+application-local.yml
+application-secret.yml
+application-*.local.yml
+*.local.yml
+.env
+.env.*
+
+### 打包 / 安装器产物（体积大，且可能带上本地配置和 Key）
+packaging/
+installer/
+release/
+*.exe
+*.msi
+*.iss
+
+### 前端构建产物在打包时从 asteria-ai/dist 拷到 static/，不入库（避免 19MB 重复）
+asteria-server/src/main/resources/static/
