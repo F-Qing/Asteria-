@@ -60,4 +60,20 @@ public interface WrongQuestionMapper extends BaseMapper<WrongQuestion> {
             ORDER BY c.sort
             """)
     List<WrongChapterCountVO> countGroupByChapter(@Param("bankId") Long bankId);
+
+    /**
+     * 某个题库「待攻克」的错题总数（题库详情页用）。
+     *
+     * <p>纯单表 COUNT —— 错题本自带 bank_id，不用 JOIN question。
+     *
+     * <p>只数 resolved = 0：与上面的 countGroupByType / countGroupByChapter、
+     * 「错题重刷」抽题是同一套口径（已攻克的题不再算错题），
+     * 这样详情页显示的错题数和点进去看到的错题统计一定对得上。
+     */
+    @Select("""
+            SELECT COUNT(*)
+            FROM wrong_question
+            WHERE bank_id = #{bankId} AND resolved = 0
+            """)
+    int countByBank(@Param("bankId") Long bankId);
 }

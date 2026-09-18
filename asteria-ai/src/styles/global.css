@@ -1,0 +1,401 @@
+/* ============================================================
+   全局样式：reset、背景与噪点颗粒、玻璃拟态、字阶、滚动条、动效
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text-main);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background var(--duration-normal) var(--ease-standard),
+    color var(--duration-normal) var(--ease-standard);
+}
+
+/* ── 全局噪点颗粒：SVG fractalNoise 平铺，消除渐变色带、增加印刷质感 ──
+   z-index:-1：铺在内容层之下、背景渐变之上，只做静态纹理，不参与前景合成 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* ── 字阶：标题用思源宋体（真 600/700），层级靠字号与字重 ── */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-synthesis: none;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+h1 { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; }
+h2 { font-size: 20px; font-weight: 600; }
+h3 { font-size: 17px; font-weight: 600; }
+
+/* 英文眉标：宽字距全大写小标签（几何 Outfit，与文楷形成对比层次） */
+.eyebrow {
+  font-family: var(--font-eyebrow);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+a:hover {
+  color: var(--primary-hover);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--text-main);
+}
+
+/* 键盘焦点环（可访问性 + 精致感） */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── 滚动条：细、低调 ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--caramel) 60%, transparent);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── 通用玻璃拟态：顶部受光微渐变 + 高模糊提饱和 + 受光细边 + 上下双 rim = 玻璃质感 ── */
+.glass {
+  background: linear-gradient(165deg, var(--glass-bg-strong) 0%, var(--glass-bg) 100%);
+  backdrop-filter: blur(30px) saturate(1.65);
+  -webkit-backdrop-filter: blur(30px) saturate(1.65);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--glass-shadow), var(--rim-light);
+}
+
+/* ── 路由过渡：page（淡入 + 微上移 / 淡出；不做全屏 filter，避免整页模糊合成开销） ── */
+.page-enter-active {
+  transition: opacity var(--duration-slow) var(--ease-standard),
+    transform var(--duration-slow) var(--ease-standard);
+}
+.page-leave-active {
+  transition: opacity var(--duration-normal) var(--ease-standard);
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px) scale(0.99);
+}
+.page-leave-to {
+  opacity: 0;
+}
+
+/* ── 列表过渡：list（消息、题目滑入，支持 --stagger 错落） ── */
+.list-enter-active {
+  transition: opacity 0.35s var(--ease-spring), transform 0.35s var(--ease-spring);
+  transition-delay: calc(var(--stagger, 0) * 45ms);
+}
+.list-leave-active {
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.list-leave-to {
+  opacity: 0;
+}
+
+/* ── 漂浮关键帧（logo 星标 / 空状态插画浮动） ── */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(3deg);
+  }
+}
+
+/* ── AI 呼吸光晕 ── */
+@keyframes breath {
+  0%, 100% {
+    box-shadow: 0 0 24px rgba(127, 159, 224, 0.32);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(127, 159, 224, 0.14);
+  }
+}
+
+/* ── 答题错误：柔和 shake ── */
+@keyframes soft-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-4px); }
+}
+.shake {
+  animation: soft-shake 0.4s var(--ease-standard);
+}
+
+/* ── 骨架屏微光（A2）：灰底 + 高光扫过，数据到达前占位 ── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--caramel) 26%, transparent);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--surface-solid) 65%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* ── 工具类 ── */
+.text-muted { color: var(--text-muted); }
+.text-sub { color: var(--text-sub); }
+
+/* ── 晨昏天空层：4 层恒驻渐变叠放，激活层 opacity 2s 交叉淡化（换天不闪变） ──
+   z-index -2：位于噪点颗粒(-1)与内容之下；渐变静止无 filter，合成成本≈0 */
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.sky-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 2s var(--ease-standard);
+}
+.sky-layer.active {
+  opacity: 1;
+}
+
+/* 清晨：暖杏低角度光 */
+.sky-morning {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 212, 160, 0.5) 0%, transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(255, 226, 195, 0.38) 0%, transparent 42%),
+    linear-gradient(180deg, #fdf7ee 0%, #f8eddd 100%);
+}
+/* 白天：默认奶油粉彩（随明暗主题走 token） */
+.sky-day {
+  background: var(--bg-gradient);
+}
+/* 黄昏：橘粉落日 */
+.sky-dusk {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(255, 190, 148, 0.5) 0%, transparent 45%),
+    radial-gradient(circle at 82% 14%, rgba(246, 185, 202, 0.45) 0%, transparent 42%),
+    radial-gradient(circle at 50% 95%, rgba(226, 199, 222, 0.45) 0%, transparent 48%),
+    linear-gradient(180deg, #fbf0e8 0%, #f3e1da 100%);
+}
+/* 深夜：真正的深蓝夜空（亮色主题下也是夜晚该有的深度，白卡片玻璃浮在上面） */
+.sky-night {
+  background:
+    radial-gradient(circle at 84% 16%, rgba(196, 210, 244, 0.16) 0%, transparent 42%),
+    radial-gradient(circle at 12% 90%, rgba(84, 98, 150, 0.35) 0%, transparent 50%),
+    linear-gradient(180deg, #1f2743 0%, #2a3253 55%, #3a4468 100%);
+}
+
+html.dark .sky-morning {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(96, 72, 48, 0.5) 0%, transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(84, 62, 44, 0.4) 0%, transparent 42%),
+    linear-gradient(180deg, #161519 0%, #171310 100%);
+}
+html.dark .sky-dusk {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(94, 54, 50, 0.55) 0%, transparent 45%),
+    radial-gradient(circle at 82% 14%, rgba(86, 50, 70, 0.45) 0%, transparent 42%),
+    linear-gradient(180deg, #171215 0%, #140f13 100%);
+}
+html.dark .sky-night {
+  background:
+    radial-gradient(circle at 84% 16%, rgba(120, 138, 196, 0.14) 0%, transparent 42%),
+    radial-gradient(circle at 12% 90%, rgba(40, 52, 96, 0.5) 0%, transparent 50%),
+    linear-gradient(180deg, #0c0d13 0%, #10121c 55%, #151a2b 100%);
+}
+
+/* ── 亮色主题 + 深夜：卡片玻璃在深蓝夜空上的可读性补偿（更白的玻璃、浮雕受光加强） ── */
+html:not(.dark) body[data-phase='night'] {
+  --glass-bg: rgba(246, 248, 255, 0.8);
+  --glass-bg-strong: rgba(251, 252, 255, 0.92);
+  --glass-line: rgba(255, 255, 255, 0.5);
+  --rim-light: inset 0 1px 0 rgba(255, 255, 255, 1), inset 1px 0 0 rgba(255, 255, 255, 0.55),
+    inset -1px 0 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 16px 30px rgba(255, 255, 255, 0.4), inset 0 -16px 30px rgba(40, 52, 92, 0.08);
+}
+
+/* ── 氛围光斑时段色：随 body[data-phase] 换色（白天走默认 token 粉彩） ── */
+body[data-phase='morning'] .ambient-1 { --blob-color: #ffd9a8; }
+body[data-phase='morning'] .ambient-2 { --blob-color: #ffe4c2; }
+body[data-phase='dusk'] .ambient-1 { --blob-color: #ffb98f; }
+body[data-phase='dusk'] .ambient-2 { --blob-color: #f2a9bc; }
+body[data-phase='dusk'] .ambient-3 { --blob-color: #d9a8c9; }
+body[data-phase='night'] .ambient-1 { --blob-color: #8fa3d9; }
+body[data-phase='night'] .ambient-2 { --blob-color: #a99ad4; }
+body[data-phase='night'] .ambient-3 { --blob-color: #7f95c9; }
+
+/* ── 氛围光斑：径向渐变模拟柔光（无 filter blur，合成成本≈0） ──
+   颜色通过 --blob-color 注入，明暗强度由 --ambient-opacity 控制 */
+@keyframes glow-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(24px, -18px) scale(1.06); }
+}
+.glow-blob {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--blob-color, var(--primary-bg)) 0%, transparent 72%);
+  pointer-events: none;
+  animation: glow-drift 18s ease-in-out infinite;
+}
+
+/* ── 流式输出光标（AI 回复生成中闪烁，带微光） ── */
+.stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  border-radius: 1px;
+  background: var(--primary-soft);
+  box-shadow: 0 0 6px rgba(127, 159, 224, 0.8);
+  animation: caret-blink 1s step-end infinite;
+}
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── 数字变化轻微缩放（倒计时天数切换） ── */
+@keyframes num-pop {
+  0% { transform: scale(0.7); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── 图标弹性出现（菜单激活、小图标点缀） ── */
+@keyframes icon-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* ── 标题渐变柔光已由问候语整行恒定渐变取代，text-shine 关键帧已删除 ── */
+
+/* ── 按钮光泽扫过（SoftButton primary hover） ── */
+@keyframes shine-sweep {
+  from { transform: translateX(-120%) skewX(-12deg); }
+  to { transform: translateX(320%) skewX(-12deg); }
+}
+
+/* ── View Transitions（A6/A9）：旧帧静止，新帧从点击处圆形漾开；元素级共享转场走默认 morph ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: vt-circle 0.55s var(--ease-standard);
+}
+@keyframes vt-circle {
+  from {
+    clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+  to {
+    clip-path: circle(150% at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+}
+
+/* ── 滚动渐入（配合 composables/useReveal）；--stagger 控制入场编排的错落延迟 ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s var(--ease-standard), transform 0.5s var(--ease-standard);
+  transition-delay: calc(var(--stagger, 0) * 70ms);
+}
+.reveal.revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* reduced-motion 下渐入降级为直接显示（不引入动画） */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

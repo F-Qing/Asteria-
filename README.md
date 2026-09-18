@@ -1,0 +1,334 @@
+# Asteria · 智能刷题系统（后端）
+
+基于 **Spring Boot 3.5 + Spring AI** 的智能刷题系统后端。
+
+把 Word / PDF / TXT 题库文档导进来，自动切题、分章节、判定题型，可选地用 AI 补全解析与知识点；
+在此之上提供刷题、错题本、知识点总结，以及一个**能自己去查题库**的 AI 答疑助手（工具调用）。
+
+> 前端（Vue 3 + Vite）源码与打包产物在 [`asteria-ai/`](./asteria-ai)，其中 `asteria-ai/dist` 是可直接部署的构建结果。
+
+---
+
+## 目录
+
+- [技术栈](#技术栈)
+- [功能](#功能)
+- [模块结构](#模块结构)
+- [快速开始](#快速开始)
+- [配置说明](#配置说明)
+- [接口一览](#接口一览)
+- [数据库](#数据库)
+- [AI 能力与设计要点](#ai-能力与设计要点)
+- [已知限制](#已知限制)
+
+---
+
+## 技术栈
+
+| 类别 | 选型 |
+|---|---|
+| 语言 / 构建 | Java 21、Maven（仓库自带 `mvnw`） |
+| 框架 | Spring Boot 3.5.16（Spring MVC / Servlet，非 WebFlux） |
+| 持久层 | MyBatis-Plus 3.5.15（含 `mybatis-plus-jsqlparser` 分页插件） |
+| 数据库 | MySQL 8 |
+| AI | Spring AI 1.1.8（`spring-ai-starter-model-openai`，OpenAI 兼容协议） |
+| 文档解析 | Apache POI 5.2.5（.docx）、Apache PDFBox 2.0.31（.pdf） |
+| 其它 | Lombok、Reactor（随 Spring AI 引入，用于 SSE 流） |
+
+Spring AI 用的是 **OpenAI 兼容协议**，所以只要服务商支持自定义 `baseUrl`，一套代码就能接
+OpenAI / DeepSeek / Moonshot / 通义 / 智谱 / 自建中转站。
+
+---
+
+## 功能
+
+1. **题库导入**：上传 `.docx` / `.pdf` / `.txt`，后台异步解析
+   - 自动识别章节、题型（单选 / 多选 / 判断 / 简答 / 填空）、拆分选项与答案
+   - 导入进度可轮询查询，失败原因落库
+2. **AI 解析增强**（可选）：题干 / 答案缺失或格式不标准时，调模型补全并回写
+3. **题库管理**：分页查询、详情（含章节与题型统计）、删除（级联删章节与题目）
+4. **刷题**：顺序 / 随机出题、错题练习、提交答案、查看结果与统计
+5. **知识点总结**：按题库让 AI 汇总知识点与易错点，结果落库做缓存（命中缓存不再调 AI）
+6. **AI 答疑**：SSE 流式对话，带**对话记忆**与**工具调用**——AI 可以自己查题库列表、按关键词搜题、取某道题的完整内容（含选项、答案、解析），再像老师一样讲解
+
+---
+
+## 模块结构
+
+```
+asteria/                     父工程：只做依赖版本管理与模块聚合，不含业务代码
+├── asteria-common/          与 Web 无关的纯工具（不依赖 Spring）
+│   ├── Tool/                QuestionParser（题目切分）、QuestionOption、RawQuestion、FileTextReader
+│   ├── exception/           BusinessException
+│   └── result/              ApiResponse（统一响应体）
+├── asteria-pojo/            数据模型：entity / DTO / VO / enums
+└── asteria-server/          可执行服务端
+    ├── ai/                  AI 接入层：配置、模型工厂、提示词、工具、脱敏、导入增强
+    ├── config/              MyBatis-Plus 配置（分页插件 + 公共字段自动填充）
+    ├── controller/          HTTP 入口
+    ├── handler/             全局异常处理
+    ├── mapper/              MyBatis-Plus Mapper
+    ├── parser/              题型判定、答案归一化
+    ├── Services/            业务接口；impl/ 为实现
+    └── tool/                docx / pdf 文本抽取
+```
+
+依赖方向是单向的：`asteria-server → asteria-pojo / asteria-common`，
+`asteria-common` 与 `asteria-pojo` 互不相识（所以解析用的 `QuestionOption` 和展示用的
+`QuestionOptionVO` 各有一份）。
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- JDK 21
+- MySQL 8
+- Maven 3.9+（或直接用仓库里的 `mvnw`）
+
+### 1. 建库建表
+
+```bash
+mysql -uroot -p -e "CREATE DATABASE finaltext DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"
+```
+
+按顺序执行 `asteria-server/src/main/resources/db/` 下的 4 个脚本（都是可重复执行的）：
+
+| 顺序 | 脚本 | 内容 |
+|---|---|---|
+| 1 | `bank_tables.sql` | `bank` / `chapter` / `question` |
+| 2 | `practice_tables.sql` | 刷题会话、答题记录、错题本 |
+| 3 | `knowledge_summary.sql` | 知识点总结缓存 |
+| 4 | `chat_tables.sql` | `chat_session` / `chat_message` |
+
+### 2. 配置数据库
+
+`application.yml` 默认激活 `dev` profile，数据库账号密码从环境变量读：
+
+```bash
+# 不设置则使用默认值 root / 123456
+export DB_USER=root
+export DB_PASSWORD=你的密码
+```
+
+也可以直接改 `asteria-server/src/main/resources/application-dev.yml`。
+
+### 3. 启动
+
+```bash
+# 在项目根目录
+mvn clean package -DskipTests
+java -jar asteria-server/target/asteria-server-0.0.1-SNAPSHOT.jar
+```
+
+或者用 IDEA 直接运行 `com.asteria.server.AsteriaServerApplication`。
+
+服务默认监听 **8080**。
+
+### 4. 前端
+
+前端源码在 `asteria-ai/`，`asteria-ai/dist` 是已经构建好的静态产物，用任意静态服务器
+（nginx / `npx serve`）托管即可，记得把 `/api` 反向代理到 `http://localhost:8080`。
+
+---
+
+## 配置说明
+
+| 配置项 | 位置 | 说明 |
+|---|---|---|
+| `server.port` | `application.yml` | 服务端口，默认 8080 |
+| `spring.ai.model.*` | `application.yml` | 全部设为 `none`：**不**在启动时按配置建模型 bean |
+| `spring.servlet.multipart.max-file-size` | `application.yml` | 单文件上限 20MB |
+| `spring.servlet.multipart.max-request-size` | `application.yml` | 单请求上限 25MB |
+| `asteria.upload-dir` | `application.yml` | 上传文件落盘目录，默认 `uploads`（已被 .gitignore 忽略） |
+| `DB_USER` / `DB_PASSWORD` | 环境变量 | 数据库账号密码 |
+| `mybatis-plus.configuration.log-impl` | `application-dev.yml` | dev 下打印 SQL，生产建议关掉 |
+
+### AI 配置是「随请求带」的（BYOK）
+
+后端**不保存任何 API Key**。前端在设置页填写后存在浏览器本地，每次请求通过 4 个请求头带过来：
+
+| 请求头 | 说明 |
+|---|---|
+| `X-AI-Provider` | 服务商标识（仅用于展示/日志） |
+| `X-AI-Key` | API Key |
+| `X-AI-Base-Url` | 接口地址，需包含版本段，例如 `https://api.deepseek.com/v1` |
+| `X-AI-Model` | 模型名，例如 `deepseek-chat` |
+
+后端的处理约定：
+
+- Key 只在构造 `OpenAiApi` 的那一处使用，**不落库、不写日志**
+- 所有上游异常信息在返回前端前统一经过 `AiErrors.mask()` 脱敏（压成一行、截断、把 Key 替换成 `***`）
+- 没配 AI 时，导入、刷题、看历史这些功能照常可用，只有真正要调模型的接口返回 `40020`
+
+---
+
+## 接口一览
+
+统一响应体：
+
+```json
+{ "code": 0, "message": "success", "data": {} }
+```
+
+业务校验失败返回 **HTTP 200 + `code != 0`**；系统级错误才用 4xx / 5xx。
+
+### 题库
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/banks` | 分页查询题库（`keyword` / `page` / `pageSize`） |
+| POST | `/api/banks/import` | 上传并导入题库（multipart） |
+| GET | `/api/banks/import/{taskId}` | 查询导入进度与状态 |
+| GET | `/api/banks/{id}` | 题库详情（含章节列表、题型统计） |
+| DELETE | `/api/banks/{id}` | 删除题库（级联删章节与题目） |
+| GET | `/api/banks/{bankId}/questions` | 题目列表 |
+
+### 刷题
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/practice/sessions` | 开始一次刷题（顺序 / 随机） |
+| POST | `/api/practice/sessions/wrong` | 开始错题练习 |
+| GET | `/api/practice/sessions` | 刷题会话列表 |
+| GET | `/api/practice/sessions/{id}` | 取当前题目 |
+| POST | `/api/practice/sessions/{id}/answers` | 提交答案 |
+| GET | `/api/practice/sessions/{id}/result` | 本次结果 |
+| GET | `/api/practice/stats` | 总览统计 |
+| GET | `/api/practice/wrong-stats` | 错题统计 |
+
+### AI
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/ai/test` | 测试 AI 配置连通性 |
+| POST | `/api/knowledge-summary` | 生成知识点总结（命中缓存则不调 AI） |
+| GET | `/api/knowledge-summary?bankId=` | 读已生成的总结，没生成过返回 `data: null` |
+
+### AI 聊天
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/chat/sessions` | 新建会话 |
+| GET | `/api/chat/sessions` | 会话列表 |
+| DELETE | `/api/chat/sessions/{id}` | 删除会话（消息级联删除） |
+| GET | `/api/chat/sessions/{id}/messages` | 历史消息（按时间正序分页） |
+| POST | `/api/chat/sessions/{id}/messages` | 发送消息，返回 **SSE 流** |
+
+SSE 事件契约（前端按此解析）：
+
+```
+event: chunk    data: {"delta":"..."}                      // 增量文本
+event: done     data: {"messageId":123,"content":"..."}     // 结束
+event: error    data: {"code":50000,"message":"..."}        // 出错（信息已脱敏）
+```
+
+### 其它
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST / GET / PUT / DELETE | `/api/config/exams` | 考试信息增删改查 |
+
+### 错误码
+
+| code | 含义 |
+|---|---|
+| 40010 | 参数不合法 |
+| 40011 | 该条件下没有题目 |
+| 40012 | 没有待攻克的错题 |
+| 40013 | 这道题不属于本次刷题会话 |
+| 40020 | 未配置 AI（缺 `X-AI-*` 请求头） |
+| 40400 | 接口不存在 |
+| 40401 | 题库不存在 |
+| 40402 | 刷题会话不存在 |
+| 40403 | 题目不存在 |
+| 40404 | 聊天会话不存在 |
+| 50000 | 服务器内部错误 |
+
+---
+
+## 数据库
+
+表结构都在 `asteria-server/src/main/resources/db/` 里，关键关系：
+
+```
+bank ──< chapter ──< question
+  └──────────────────< question          （question.bank_id 是冗余列，便于按题库直接筛题）
+
+practice_session ──< practice_session_question
+        └──────────< practice_record
+wrong_question（错题本，与 question 关联）
+
+knowledge_summary（按题库缓存 AI 总结）
+
+chat_session ──< chat_message            （删会话时消息 ON DELETE CASCADE 级联删除）
+```
+
+约定：
+
+- 时间戳统一由 `MybatisPlusConfig` 里的 `MetaObjectHandler` 自动填充
+  （`created_at` 插入时填、`updated_at` 插入与更新时填；注意 `strictUpdateFill` **只在字段为 null 时**才填）
+- `chat_session.message_count` 是冗余字段，每插入一条消息 +1
+- `chat_message.content` 用 `MEDIUMTEXT`；流式中断时保存**已生成的那部分**并标记 `interrupted = 1`
+
+---
+
+## AI 能力与设计要点
+
+### 1. 导入时的解析增强
+
+文档解析走 `asteria-common` 的 `QuestionParser`（纯文本规则，不依赖模型），
+识别不出题干或答案的题交给 `QuestionAiEnricher` 用模型补全；AI 不可用时跳过、正常入库。
+
+### 2. 知识点总结
+
+取题库内最多 **300 道**题的题干与答案拼成材料，温度 **0.3**（要稳定），
+结果写回 `knowledge_summary` 做缓存；再次请求同题库直接读缓存，不再调用模型。
+
+### 3. AI 聊天
+
+- **模型按请求现场构造**：`AiChatModelFactory` 每次用请求头里的 Key / baseUrl / model 造一个
+  `OpenAiChatModel`，用完即弃——BYOK 模式下不能复用单例，否则会把 A 的 Key 用到 B 的请求上。
+- **对话记忆**：模型是无状态的，每轮请求都要把历史重新拼上去。
+  取最近 **100 条 / 30000 字符**（两道闸）按正序拼成 `UserMessage` / `AssistantMessage`。
+  不做无限量是因为模型上下文窗口是硬限制，塞爆会直接 400 报错。
+  ⚠️ 目前**只持久化 user / assistant 的文本**，不保存工具调用与工具结果。
+- **工具调用**：`QuestionBankTools` 暴露 3 个工具给模型自己调用
+
+  | 工具 | 作用 |
+  |---|---|
+  | `listBanks()` | 列出所有题库（名称 + 题目数） |
+  | `searchQuestions(keyword, bankName?, type?, limit?)` | 按关键词搜题干，返回题目 id / 题型 / 题干 / 答案 |
+  | `getQuestionDetail(questionId)` | 取某道题的完整内容（选项、答案、解析、知识点、章节） |
+
+  工具方法内部一律 `try/catch`：工具抛异常会让整条 SSE 变成 error 事件，
+  转成一句人话回给模型，它还能接着答。返回值是"给模型看的紧凑文本"而不是 JSON，省 token 且不易看错。
+
+- **系统提示词**：核心是把两种知识分开——**题库里的事实（题干/答案/解析）必须先查工具、不许编**；
+  **学科知识（原理/推导/举例）可以放心展开讲**。此外约束它不暴露内部 id、
+  不罗列超过上限的题目、解析缺失时说明是"我自己的讲解"而非官方解析。
+
+### 4. 安全
+
+- Key 只在造 `OpenAiApi` 时使用，不落库、不进日志
+- 上游异常统一 `AiErrors.mask()` 脱敏后再返回前端
+- 工具返回的题目内容来自本库，不含用户凭据
+
+---
+
+## 已知限制
+
+- **没有鉴权**：接口不区分用户，所有会话共享同一个题库空间，适合本地或内网部署
+- 单文件上传上限 20MB，单请求 25MB
+- 知识点总结最多取 300 题
+- 聊天上下文的窗口是 100 条 / 30000 字符，超出部分丢弃
+- `uploads/`（上传文件落盘目录）不入版本库
+- AI 功能依赖用户自带的 Key 与模型；**部分模型不支持 function calling**，
+  此时 AI 不会调用工具，表现为"查不到题"或凭空回答
+
+---
+
+## License
+
+未指定。

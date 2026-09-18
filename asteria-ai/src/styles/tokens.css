@@ -1,0 +1,173 @@
+/* ============================================================
+   Asteria AI 设计 Token v2（方向 C：高级化二次元 · 米哈游质感参考）
+   原则：粉彩只做氛围；质感 = 对比层级 + 精细描边 + 双层阴影 + 统一线性图标
+   ============================================================ */
+
+:root {
+  /* ── 品牌色（小面积点缀：主按钮 / 链接 / 选中态 / 品牌渐变） ── */
+  --primary: #4a80ee;
+  --primary-hover: #3a6cd9;
+  --primary-soft: #7f9fe0;              /* 降饱和：图标、标签、次级点缀 */
+  --primary-bg: #ccdaf6;                /* 大面积淡蓝底 */
+  --primary-violet: #8f7ff0;            /* 渐变末端：轻紫，品牌渐变专用 */
+  --primary-glow: rgba(74, 128, 238, 0.16);
+  --brand-grad: linear-gradient(135deg, #5b8def 0%, #8f7ff0 100%);
+
+  /* ── 粉彩调色板（氛围与语义底色，低饱和） ── */
+  --sakura: #f2d8dc;
+  --cream: #faf8f5;
+  --blue-gray: #e7eef7;
+  --mint: #e2f0e9;
+  --lavender: #ebe7f2;
+  --apricot: #f6ecdf;
+  --caramel: #d8ccb4;
+
+  /* ── 文字（亮色下足够深，拉开层级） ── */
+  --text-main: #37332f;
+  --text-sub: #5f5a54;
+  --text-muted: #9d948a;
+  --text-on-primary: #ffffff;
+
+  /* ── 语义色 ── */
+  --success: #6fae94;
+  --success-bg: var(--mint);
+  --error: #dd8b8b;
+  --error-bg: #f8e7e7;
+  --warning: #d5ad66;
+  --warning-bg: var(--apricot);
+  --info: var(--primary-soft);
+  --info-bg: var(--blue-gray);
+
+  /* ── 表面与玻璃 ── */
+  --bg-base: var(--cream);
+  --surface-solid: #ffffff;             /* 弹层/下拉等需要不透明背景处 */
+  --surface-overlay: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.5);
+  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-line: rgba(90, 78, 66, 0.13);  /* 描边细线（非纯白边） */
+  /* 浮雕式受光：顶/左亮棱 + 底/右暗棱 + 顶部内发光 + 底部内阴影 */
+  --rim-light: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 1px 0 0 rgba(255, 255, 255, 0.4),
+    inset -1px 0 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 16px 30px rgba(255, 255, 255, 0.32), inset 0 -16px 30px rgba(83, 72, 62, 0.05);
+  --glass-shadow: 0 2px 4px rgba(83, 72, 62, 0.06), 0 8px 20px rgba(83, 72, 62, 0.08), 0 18px 44px rgba(83, 72, 62, 0.12);
+
+  /* ── 页面背景：大尺度低透明粉彩晕染，忌脏忌浓 ── */
+  --bg-gradient:
+    radial-gradient(circle at 12% 8%, rgba(242, 216, 220, 0.38) 0%, transparent 40%),
+    radial-gradient(circle at 88% 14%, rgba(235, 231, 242, 0.5) 0%, transparent 42%),
+    radial-gradient(circle at 50% 96%, rgba(231, 238, 247, 0.55) 0%, transparent 48%),
+    linear-gradient(180deg, #faf8f5 0%, #f6f1ea 100%);
+
+  /* ── 氛围光斑（AppLayout 专用，明暗两套强度；形态由径向渐变实现，无 blur） ── */
+  --ambient-opacity: 0.5;
+
+  /* ── 全局噪点颗粒（印刷质感，消除渐变色带） ── */
+  --noise-opacity: 0.028;
+
+  /* ── 字体系统 ── */
+  /* 标题/展示：思源宋体（真 600/700 字重，杂志编辑感） */
+  --font-display: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  /* 正文：Inter + 系统中文黑体栈 */
+  --font-body: 'Inter Variable', 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei UI', sans-serif;
+  /* 品牌字标与小点缀：同宋体 */
+  --font-accent: 'Noto Serif SC', 'Songti SC', serif;
+  /* 英文眉标（宽字距全大写小标签）：几何 Outfit */
+  --font-eyebrow: 'Outfit', 'Inter Variable', sans-serif;
+  --eyebrow-tracking: 0.14em;
+
+  /* ── 间距：4px 基栅 ── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px;
+
+  /* ── 圆角 ── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* ── 阴影：双层（环境光 + 键照光），悬停深度真实 ── */
+  --shadow-sm: 0 1px 2px rgba(83, 72, 62, 0.05), 0 2px 8px rgba(83, 72, 62, 0.04);
+  --shadow-md: 0 1px 2px rgba(83, 72, 62, 0.05), 0 10px 28px rgba(83, 72, 62, 0.08);
+  --shadow-lg: 0 2px 4px rgba(83, 72, 62, 0.05), 0 18px 44px rgba(83, 72, 62, 0.12);
+  --shadow-xl: 0 4px 10px rgba(83, 72, 62, 0.07), 0 28px 72px rgba(83, 72, 62, 0.16);
+  --glow-primary: 0 0 0 3px var(--primary-glow);
+
+  /* ── 动效 ── */
+  --ease-standard: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 0.15s;
+  --duration-normal: 0.3s;
+  --duration-slow: 0.5s;
+  --transition: all var(--duration-normal) var(--ease-standard);
+}
+
+/* ── 深色模式：更深更稳，靠描边与 rim light 分层，粉彩只留一线 ── */
+html.dark {
+  --primary: #7fa3e8;
+  --primary-hover: #93b3ee;
+  --primary-soft: #6888b8;
+  --primary-bg: #39455c;
+  --primary-violet: #9a8cf0;
+  --primary-glow: rgba(127, 163, 232, 0.2);
+  --brand-grad: linear-gradient(135deg, #6f97e0 0%, #9a8cf0 100%);
+
+  --sakura: rgba(94, 74, 82, 0.5);
+  --cream: #161519;
+  --blue-gray: rgba(48, 58, 74, 0.45);
+  --mint: rgba(52, 78, 66, 0.45);
+  --lavender: rgba(66, 60, 84, 0.45);
+  --apricot: rgba(88, 76, 58, 0.45);
+  --caramel: #5f564a;
+
+  --text-main: #ece8e2;
+  --text-sub: #c6c0b8;
+  --text-muted: #877f75;
+
+  --success: #6fae94;  --success-bg: #26332d;
+  --error: #d99595;    --error-bg: #423536;
+  --warning: #d5ad66;  --warning-bg: #38322a;
+  --info: #7fa3e8;     --info-bg: #262b33;
+
+  --bg-base: #161519;
+  --surface-solid: #201f24;
+  --surface-overlay: #26252b;
+  --glass-bg: rgba(30, 29, 36, 0.52);
+  --glass-bg-strong: rgba(30, 29, 36, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-line: rgba(255, 255, 255, 0.10);
+  /* 浮雕式受光（暗色版）：亮棱更含蓄，底部内阴影更重 */
+  --rim-light: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 1px 0 0 rgba(255, 255, 255, 0.06),
+    inset -1px 0 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    inset 0 16px 30px rgba(255, 255, 255, 0.045), inset 0 -16px 30px rgba(0, 0, 0, 0.28);
+  --glass-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 26px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.45);
+
+  --bg-gradient:
+    radial-gradient(circle at 12% 8%, rgba(74, 58, 64, 0.32) 0%, transparent 40%),
+    radial-gradient(circle at 88% 14%, rgba(44, 41, 52, 0.45) 0%, transparent 42%),
+    radial-gradient(circle at 50% 96%, rgba(38, 43, 51, 0.5) 0%, transparent 48%),
+    linear-gradient(180deg, #161519 0%, #141317 100%);
+
+  --ambient-opacity: 0.18;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.28), 0 10px 28px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.3), 0 18px 44px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 4px 10px rgba(0, 0, 0, 0.35), 0 28px 72px rgba(0, 0, 0, 0.5);
+
+  --noise-opacity: 0.04;
+}
+
+/* ── prefers-reduced-motion 兜底：全局禁用非必要动画 ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

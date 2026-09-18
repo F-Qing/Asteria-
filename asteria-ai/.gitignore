@@ -1,0 +1,18 @@
+# ===== 依赖与构建缓存 =====
+node_modules/
+.npm-cache/
+
+# ===== 本地工具 / AI 配置（可能含密钥，禁止提交）=====
+.claude/
+.zcode/
+output_exe/
+.env
+.env.local
+*.local
+
+# ===== 编辑器 / 系统 =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

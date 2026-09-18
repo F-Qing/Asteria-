@@ -1,0 +1,190 @@
+/* ============================================================
+   Element Plus 主题映射与组件细节柔化
+   仅 CSS 变量覆盖，不引入 SCSS 编译定制；
+   暗色基础变量由 main.ts 引入的 dark/css-vars.css 提供，此处统一到品牌 token
+   ============================================================ */
+
+:root {
+  --el-color-primary: var(--primary);
+  --el-color-primary-light-3: #7ca3f2;
+  --el-color-primary-light-5: #a5c0f6;
+  --el-color-primary-light-7: #cfddf9;
+  --el-color-primary-light-8: #e0e9fb;
+  --el-color-primary-light-9: #eff4fd;
+  --el-color-primary-dark-2: var(--primary-hover);
+  --el-color-success: var(--success);
+  --el-color-error: var(--error);
+  --el-color-warning: var(--warning);
+  --el-text-color-primary: var(--text-main);
+  --el-text-color-regular: var(--text-sub);
+  --el-text-color-secondary: var(--text-muted);
+  --el-text-color-placeholder: var(--text-muted);
+  --el-border-color: var(--glass-line);
+  --el-border-color-light: var(--glass-line);
+  --el-border-color-lighter: var(--glass-line);
+  --el-border-color-extra-light: var(--glass-line);
+  --el-border-radius-base: 10px;
+  --el-bg-color: var(--surface-solid);
+  --el-bg-color-overlay: var(--surface-overlay);
+  --el-fill-color-blank: var(--surface-solid);
+  --el-fill-color-light: var(--blue-gray);
+  --el-font-family: var(--font-body);
+  --el-box-shadow-light: var(--shadow-md);
+}
+
+html.dark {
+  --el-color-primary-light-3: #5a76b0;
+  --el-color-primary-light-5: #42547a;
+  --el-color-primary-light-7: #303a52;
+  --el-color-primary-light-8: #2a3245;
+  --el-color-primary-light-9: #232a3a;
+  --el-color-primary-dark-2: #93b3ee;
+  --el-fill-color-blank: transparent;
+  --el-fill-color-light: rgba(255, 255, 255, 0.05);
+}
+
+/* ── 组件细节柔化 ── */
+
+.el-button {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: var(--transition);
+}
+.el-button:active {
+  transform: scale(0.98);
+}
+/* 主按钮：品牌渐变（小面积点缀主视觉） */
+.el-button--primary {
+  background: var(--brand-grad);
+  border: none;
+  box-shadow: 0 2px 8px rgba(90, 120, 230, 0.28);
+}
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: var(--brand-grad);
+  filter: brightness(1.08);
+}
+.el-button--primary:active {
+  background: var(--brand-grad);
+  filter: brightness(0.96);
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus,
+.el-select__wrapper.is-focused {
+  box-shadow: var(--glow-primary);
+}
+
+.el-dialog {
+  border-radius: var(--radius-xl);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(30px) saturate(1.6);
+  border: 1px solid var(--glass-line);
+  box-shadow: var(--shadow-xl);
+}
+.el-dialog__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.el-message {
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(30px);
+  border-color: var(--glass-line);
+  box-shadow: var(--shadow-md);
+}
+
+.el-message-box {
+  border-radius: var(--radius-xl);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(30px);
+  border: 1px solid var(--glass-line);
+}
+
+.el-upload-dragger {
+  border-radius: var(--radius-lg);
+  border: 2px dashed color-mix(in srgb, var(--caramel) 75%, transparent);
+  background: var(--glass-bg);
+  transition: var(--transition);
+}
+.el-upload-dragger:hover {
+  border-color: var(--primary-soft);
+  background: var(--glass-bg-strong);
+}
+
+.el-select-dropdown,
+.el-popper.is-light {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-line);
+}
+
+/* 弹层一律用不透明表面，避免玻璃叠玻璃的文字发虚 */
+.el-select-dropdown,
+.el-popper.is-light,
+.el-popper.is-dark {
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-lg);
+}
+
+.el-radio,
+.el-checkbox {
+  --el-radio-input-border-color-hover: var(--primary-soft);
+  --el-checkbox-input-border-color-hover: var(--primary-soft);
+}
+
+/* 暗色下弹层/下拉的表面与描边 */
+html.dark .el-popper.is-light,
+html.dark .el-select-dropdown,
+html.dark .el-message,
+html.dark .el-message-box {
+  background: var(--surface-overlay);
+  border-color: var(--glass-line);
+}
+
+/* ── 弹层弹簧入场（A3）：覆盖 EP 默认的生硬出现，统一缩放+上浮回弹 ── */
+.el-dialog,
+.el-message-box {
+  animation: layer-spring 0.34s var(--ease-spring);
+}
+@keyframes layer-spring {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+  }
+}
+.el-message {
+  animation: message-drop 0.38s var(--ease-spring);
+}
+@keyframes message-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.94);
+  }
+}
+.el-select-dropdown,
+.el-popper.is-light {
+  animation: popper-rise 0.22s var(--ease-standard);
+}
+@keyframes popper-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .el-dialog,
+  .el-message-box,
+  .el-message,
+  .el-select-dropdown,
+  .el-popper.is-light {
+    animation: none;
+  }
+}

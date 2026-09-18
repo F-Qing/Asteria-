@@ -17,11 +17,13 @@ import com.asteria.pojo.enums.ImportStatus;
 import com.asteria.server.Services.BanksImportTransactional;
 import com.asteria.server.Services.BanksService;
 import com.asteria.server.ai.AiRequestConfig;
+import com.asteria.server.ai.ImportTextFormatter;
 import com.asteria.server.ai.QuestionAiEnricher;
 import com.asteria.server.mapper.BankMapper;
 import com.asteria.server.mapper.BanksImportMapper;
 import com.asteria.server.mapper.ChapterMapper;
 import com.asteria.server.mapper.QuestionMapper;
+import com.asteria.server.mapper.WrongQuestionMapper;
 import com.asteria.server.tool.DocxTextReader;
 import com.asteria.server.tool.PdfTextReader;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -80,10 +82,16 @@ public class BanksServiceImpl implements BanksService {
     private QuestionMapper questionMapper;
     @Autowired
     private ChapterMapper chapterMapper;
+    @Autowired
+    private WrongQuestionMapper wrongQuestionMapper;
 
     /** 单题 AI 解析器（内部自己造 ChatModel，这里不用管 key/baseUrl） */
     @Autowired
     private QuestionAiEnricher questionAiEnricher;
+
+    /** 解析不出题目时的兜底：用 AI 把文本整理成标准格式（内部分块，只负责文本转换） */
+    @Autowired
+    private ImportTextFormatter importTextFormatter;
 
     /**
      * 上传入口：校验 → 存盘 → 登记任务 → 启动后台线程 → 立刻返回 taskId。
@@ -192,6 +200,39 @@ public class BanksServiceImpl implements BanksService {
                 }
                 return v;
             });
+
+            // ①.5 【兜底】按原样解析不出可用题目 → 用 AI 把文本整理成标准格式，再解析一次
+            //      这是"救乱格式的文件"，不是默认路径：格式正常的文件永远不会走到这里
+            if (!looksUsable(rawQuestions)) {
+                if (aiConfig == null) {
+                    throw new BusinessException(40020,
+                            "文件格式无法自动识别；请先在「设置」页配置 AI 服务后重试，或按「题目格式要求」整理后再上传");
+                }
+                log.warn("taskId={} 直接解析不出可用题目，改用 AI 整理格式后重试", taskId);
+
+                importTasks.compute(taskId, (k, v) -> {
+                    if (v != null) {
+                        v.setStatus(ImportStatus.AI_FORMATTING.name());
+                        v.setProgress(0);
+                    }
+                    return v;
+                });
+
+                content = importTextFormatter.format(content, aiConfig, percent ->
+                        importTasks.compute(taskId, (k, v) -> {
+                            if (v != null) {
+                                v.setProgress(percent);
+                            }
+                            return v;
+                        }));
+
+                rawQuestions = new QuestionParser().parse(content);
+                log.info("AI 整理后重新解析：taskId={}, 共{}条原始题", taskId, rawQuestions.size());
+                if (!looksUsable(rawQuestions)) {
+                    throw new BusinessException(50001, "文件经过 AI 整理后仍识别不出题目，请检查文件内容");
+                }
+            }
+
             // ② 入库：题库 + 章节 + 题目 + 任务状态，同一个事务（跨 Bean 调用，事务才生效）
             //    多传一个 aiParse：为 true 时任务状态会停在 AI_PROCESSING 而不是 SUCCESS
             boolean aiParse = aiConfig != null;
@@ -252,6 +293,18 @@ public class BanksServiceImpl implements BanksService {
             // 清理落盘文件（文件系统不受事务保护，得手动删）
             deleteQuietly(destFile);
         }
+    }
+
+    /**
+     * 这批原始题"有没有救"：至少要有一道题干非空。
+     *
+     * <p>为什么用题干判断：题干是入库的硬门槛（stem 列 NOT NULL），
+     * 而题干只可能从「题目/题干：」标签或题号行里提取出来。一道都没有，
+     * 说明这份文件的写法不在这套解析规则覆盖范围内 —— 值得用 AI 兜底整理一次。
+     */
+    private boolean looksUsable(List<RawQuestion> rawQuestions) {
+        return rawQuestions.stream()
+                .anyMatch(raw -> raw.getRawStem() != null && !raw.getRawStem().isBlank());
     }
 
     // ========== AI 解析阶段 ==========
@@ -433,11 +486,14 @@ public class BanksServiceImpl implements BanksService {
         // 3) 章节 + 每章题目数（一条 JOIN 查询搞定，已按 sort 排好序）
         List<ChapterVO> chapters = chapterMapper.selectChaptersWithCount(id);
 
-        // 4) 组装：公共字段交给 fillBankFields，再补详情特有的两个
+        // 4) 待攻克错题数：错题本 wrong_question 自带 bank_id，单表 COUNT 直接查出
+        int wrongCount = wrongQuestionMapper.countByBank(id);
+
+        // 5) 组装：公共字段交给 fillBankFields，再补详情特有的两个
         BankDetailVO detail = new BankDetailVO();
         fillBankFields(detail, bank, typeCounts, chapters.size());
         detail.setChapters(chapters);
-        detail.setWrongCount(0);          // TODO 错题功能做完后，改成查错题表
+        detail.setWrongCount(wrongCount);
         return detail;
     }
 

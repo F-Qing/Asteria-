@@ -15,7 +15,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)     // 继承 + Lombok @Data 必须加，否则 equals 会漏掉父类字段
 public class BankDetailVO extends BanksVO {
 
-    /** 错题总数（错题功能做完后才有真值） */
+    /** 待攻克错题数（resolved=0）：从错题本 wrong_question 按题库实时统计，与错题统计接口口径一致 */
     private Integer wrongCount;
 
     /** 章节列表（每章带题目数） */

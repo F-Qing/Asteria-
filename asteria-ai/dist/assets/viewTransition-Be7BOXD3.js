@@ -1,0 +1,1 @@
+function o(e,t){const n=document;if(!n.startViewTransition||window.matchMedia("(prefers-reduced-motion: reduce)").matches){e();return}t&&(document.documentElement.style.setProperty("--vt-x",`${t.x}px`),document.documentElement.style.setProperty("--vt-y",`${t.y}px`)),n.startViewTransition(e)}export{o as w};
