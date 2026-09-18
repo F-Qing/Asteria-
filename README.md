@@ -87,7 +87,8 @@ asteria/                     父工程：只做依赖版本管理与模块聚合
 
 - JDK 21
 - MySQL 8
-- Maven 3.9+（或直接用仓库里的 `mvnw`）
+- Maven 3.9+（或直接用仓库里的 `mvnw`；Windows 下是 `mvnw.cmd`）
+- Node.js 20+（仅改前端 / 重新构建前端时需要；只跑 jar 不用装）
 
 ### 1. 建库建表
 
@@ -147,6 +148,10 @@ java -jar asteria-server/target/asteria-server-0.0.1-SNAPSHOT.jar
 或者用 IDEA 直接运行 `com.asteria.server.AsteriaServerApplication`。
 
 服务默认监听 **8080**。
+
+**确认启动成功**：日志出现 `Started AsteriaServerApplication` 即已就绪；
+浏览器打开 `http://localhost:8080` 能看到界面（jar 自带前端，见下一步方式 C）。
+起不来最常见的原因是 MySQL 没启动或账号密码不对——看日志里的 `datasource` 报错即可定位。
 
 ### 4. 前端
 
