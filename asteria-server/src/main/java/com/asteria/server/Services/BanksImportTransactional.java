@@ -101,50 +101,70 @@ public class BanksImportTransactional {
         }
         log.info("章节划分：taskId={}, 共 {} 章，{}", taskId, chapterIds.size(), chapterIds.keySet());
 
-        // 3) 逐题：判型 → 归一化 → 过滤 → 插入
+        // 3) 逐题：查题干 → 判型 → 归一化 → 过滤 → 插入
         int no = 0;
         int inserted = 0;
         int skipped = 0;
+        int skippedNoStem = 0;      // 没有题干被跳过的题数
+        int skippedNoType = 0;      // 判不出题型被跳过的题数
         List<Integer> skippedNos = new ArrayList<>();
 
         for (RawQuestion rawQuestion : rawQuestions) {
             no++;
 
-            // 3.1 判不出题型 → 跳过（不入库）
-            QuestionType type = questionClassifier.classify(rawQuestion);
-            if (type == null) {
+            // 3.1 【必须放在判型之前】没有题干 → 跳过。
+            //     为什么不能让数据库兜：stem 列是 TEXT NOT NULL 且**没有默认值**，
+            //     而 MyBatis-Plus 默认字段策略是 NOT_NULL —— 字段为 null 时它会把该列
+            //     从 INSERT 的列清单里整个剔掉，于是 MySQL 严格模式直接报
+            //     1364「Field 'stem' doesn't have a default value」。
+            //     导入是同一个事务，一条脏数据就能把整批题目全部回滚，
+            //     前端只看到一个 SQL 报错。所以空题干必须在这里拦掉。
+            String stem = rawQuestion.getRawStem();
+            if (stem == null || stem.isBlank()) {
                 skipped++;
+                skippedNoStem++;
                 skippedNos.add(no);
                 continue;
             }
 
-            // 3.2 【改】答案取不到不再跳过：answer 列是 NOT NULL，用空串占位，
+            // 3.2 判不出题型 → 跳过（不入库）
+            QuestionType type = questionClassifier.classify(rawQuestion);
+            if (type == null) {
+                skipped++;
+                skippedNoType++;
+                skippedNos.add(no);
+                continue;
+            }
+
+            // 3.3 【改】答案取不到不再跳过：answer 列是 NOT NULL，用空串占位，
             //     缺答案的题照样入库，交给后台的 AI 阶段补答案（未开启 AI 时就一直是空串）
             String answer = answerNormalizer.normalize(rawQuestion, type);
             if (answer == null) {
                 answer = "";
             }
 
-            // 3.3 组装并插入（注意：每题都 new 一个新对象，绝不复用同一个）
+            // 3.4 组装并插入（注意：每题都 new 一个新对象，绝不复用同一个）
             Question question = new Question();
             question.setBankId(bankId);
             question.setChapterId(chapterIds.get(chapterNameOf(rawQuestion)));
             question.setType(type.name());
-            question.setStem(rawQuestion.getRawStem());
+            question.setStem(stem.trim());
             question.setOptions(objectMapper.writeValueAsString(rawQuestion.getRawOptions()));
             question.setAnswer(answer);
             questionMapper.insert(question);
             inserted++;
         }
 
-        // 3.4 一道题都没入库 → 整体失败（抛异常让事务回滚，避免留下一个空题库）
+        // 3.5 一道题都没入库 → 整体失败（抛异常让事务回滚，避免留下一个空题库）
         if (inserted == 0) {
-            // 两种情况的成因完全不同，提示要分开给，用户才知道该改什么：
-            //   no == 0 → 连题都没切出来，多半是缺【第 N 题】题号（没有题号整份文件都进不了切块）
-            //   no  > 0 → 切出来了但题型全判不出，多半是缺题型/缺答案
+            // 三种情况的成因完全不同，提示要分开给，用户才知道该改什么：
+            //   no == 0        → 连题都没切出来，多半是缺【第 N 题】题号（没有题号整份文件都进不了切块）
+            //   skippedNoStem  → 切出来了，但块里没有「题目：/题干：」，题干提不出来
+            //   skippedNoType  → 题干有了，但判不出题型（缺题型标签、缺答案、也没有选项）
             throw new IllegalStateException(no == 0
                     ? "未识别到题目，请按标准格式整理：每道题以【第 N 题】开头，并写「题目：题干」（上传页可查看格式要求）"
-                    : "解析出 " + no + " 题但全部无法入库（题型无法识别），请按标准格式整理后重新上传（上传页可查看格式要求）");
+                    : "解析出 " + no + " 题但全部无法入库（无题干 " + skippedNoStem
+                    + " 题、题型无法识别 " + skippedNoType + " 题），请按标准格式整理后重新上传（上传页可查看格式要求）");
         }
 
         // 4) 任务收尾：必须放在所有题目插入【之后】，且和上面同一个事务。
@@ -159,7 +179,8 @@ public class BanksImportTransactional {
                 .build());
 
         if (skipped > 0) {
-            log.warn("taskId={} 跳过 {} 题（题型无法识别）：第 {} 题", taskId, skipped, skippedNos);
+            log.warn("taskId={} 跳过 {} 题（无题干 {} 题 / 题型无法识别 {} 题）：第 {} 题",
+                    taskId, skipped, skippedNoStem, skippedNoType, skippedNos);
         }
         log.info("入库完成：taskId={}, bankId={}, 入库{}题, 跳过{}题, aiParse={}",
                 taskId, bankId, inserted, skipped, aiParse);

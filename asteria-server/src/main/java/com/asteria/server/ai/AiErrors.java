@@ -3,7 +3,7 @@ package com.asteria.server.ai;
 /**
  * AI 调用相关的公共小工具。
  *
- * <p>为什么单独一个类：脱敏逻辑（AiServiceImpl / ImportTextFormatter 都要用）如果各写一份，
+ * <p>为什么单独一个类：脱敏逻辑（AiServiceImpl / AiQuestionExtractor 都要用）如果各写一份，
  * 哪天规则改了就会漏改一处，而"把 key 打到日志里"是不能出错的。
  */
 public final class AiErrors {

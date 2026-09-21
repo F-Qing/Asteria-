@@ -36,7 +36,11 @@ public class DocxTextReader {
                 text = text.substring(1);
             }
             // 统一换行：\r\n 和单独的 \r 都变成 \n
-            return text.replace("\r\n", "\n").replace('\r', '\n');
+            text = text.replace("\r\n", "\n").replace('\r', '\n');
+            // 制表符也变成换行：Word 里排版选项时习惯用 Tab 把 A．/B．/C．/D． 并在同一个段落里，
+            // POI 抽出来就是 "A．甲\tB．乙\tC．丙\tD．丁" 一行。解析器是**按行**切选项的，
+            // 不拆开的话整行只会被认成一个选项（后面的选项全被并进 A 的内容里）。
+            return text.replace("\t", "\n");
         }
     }
 }

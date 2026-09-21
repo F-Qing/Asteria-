@@ -16,8 +16,8 @@ import com.asteria.pojo.entity.VO.PageResultVO;
 import com.asteria.pojo.enums.ImportStatus;
 import com.asteria.server.Services.BanksImportTransactional;
 import com.asteria.server.Services.BanksService;
+import com.asteria.server.ai.AiQuestionExtractor;
 import com.asteria.server.ai.AiRequestConfig;
-import com.asteria.server.ai.ImportTextFormatter;
 import com.asteria.server.ai.QuestionAiEnricher;
 import com.asteria.server.mapper.BankMapper;
 import com.asteria.server.mapper.BanksImportMapper;
@@ -89,9 +89,9 @@ public class BanksServiceImpl implements BanksService {
     @Autowired
     private QuestionAiEnricher questionAiEnricher;
 
-    /** 解析不出题目时的兜底：用 AI 把文本整理成标准格式（内部分块，只负责文本转换） */
+    /** 解析不出题目时的兜底：让 AI 按 JSON schema 把原文抽成结构化题目（内部按题目边界分块 + 逐题校验） */
     @Autowired
-    private ImportTextFormatter importTextFormatter;
+    private AiQuestionExtractor aiQuestionExtractor;
 
     /**
      * 上传入口：校验 → 存盘 → 登记任务 → 启动后台线程 → 立刻返回 taskId。
@@ -201,14 +201,14 @@ public class BanksServiceImpl implements BanksService {
                 return v;
             });
 
-            // ①.5 【兜底】按原样解析不出可用题目 → 用 AI 把文本整理成标准格式，再解析一次
+            // ①.5 【兜底】规则解析不出可用题目 → 交给 AI 做【结构化抽取】（不是"改写成标准文本再正则解析"）
             //      这是"救乱格式的文件"，不是默认路径：格式正常的文件永远不会走到这里
             if (!looksUsable(rawQuestions)) {
                 if (aiConfig == null) {
                     throw new BusinessException(40020,
                             "文件格式无法自动识别；请先在「设置」页配置 AI 服务后重试，或按「题目格式要求」整理后再上传");
                 }
-                log.warn("taskId={} 直接解析不出可用题目，改用 AI 整理格式后重试", taskId);
+                log.warn("taskId={} 直接解析不出可用题目，改用 AI 结构化抽取", taskId);
 
                 importTasks.compute(taskId, (k, v) -> {
                     if (v != null) {
@@ -218,7 +218,7 @@ public class BanksServiceImpl implements BanksService {
                     return v;
                 });
 
-                content = importTextFormatter.format(content, aiConfig, percent ->
+                rawQuestions = aiQuestionExtractor.extract(content, aiConfig, percent ->
                         importTasks.compute(taskId, (k, v) -> {
                             if (v != null) {
                                 v.setProgress(percent);
@@ -226,10 +226,9 @@ public class BanksServiceImpl implements BanksService {
                             return v;
                         }));
 
-                rawQuestions = new QuestionParser().parse(content);
-                log.info("AI 整理后重新解析：taskId={}, 共{}条原始题", taskId, rawQuestions.size());
+                log.info("AI 结构化抽取完成：taskId={}, 共{}条题", taskId, rawQuestions.size());
                 if (!looksUsable(rawQuestions)) {
-                    throw new BusinessException(50001, "文件经过 AI 整理后仍识别不出题目，请检查文件内容");
+                    throw new BusinessException(50001, "AI 没能从文件里抽出题目，请检查文件内容是否真的是题库");
                 }
             }
 
@@ -566,7 +565,9 @@ public class BanksServiceImpl implements BanksService {
         if (raw == null || raw.isBlank()) {
             raw = e.getClass().getSimpleName();
         }
-        String firstLine = raw.lines().findFirst().orElse(raw).trim();
+        // 取第一行【非空】内容：异常信息里常带前导换行（如 SQL 异常的 "### Error updating database..." 之前），
+        // 直接取 lines().findFirst() 会拿到空串，前端就变成"失败了但没有原因"。
+        String firstLine = raw.lines().map(String::trim).filter(s -> !s.isEmpty()).findFirst().orElse(raw).trim();
         return firstLine.length() > MAX_REASON_LENGTH ? firstLine.substring(0, MAX_REASON_LENGTH) : firstLine;
     }
 

@@ -230,7 +230,7 @@ const stageText = computed(() => {
     case 'PARSING':
       return '解析文档 → 识别题目…'
     case 'AI_FORMATTING':
-      return 'AI 整理格式中（文件排版较乱，正转成标准格式）…'
+      return 'AI 正在识别题目结构（文件排版较乱，正逐块抽取）…'
     case 'AI_PROCESSING':
       return 'AI 解析入库中…'
     default:

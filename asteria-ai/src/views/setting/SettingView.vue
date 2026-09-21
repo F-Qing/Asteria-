@@ -45,8 +45,12 @@
             placeholder="选择或输入模型名"
             class="model-select"
           >
-            <el-option v-for="m in modelSuggestions" :key="m" :value="m" :label="m" />
+            <el-option v-for="m in modelSuggestions" :key="m" :value="m" :label="modelLabelOf(provider, m)" />
           </el-select>
+          <p v-if="provider === 'deepseek'" class="field-hint text-muted">
+            deepseek-flash = DeepSeek-V4.1-Flash（2026-09-10 发布，官方说改用它就是调最新 V4.1 Flash）；
+            老的 deepseek-chat / deepseek-reasoner 已下线，请不要再选。
+          </p>
         </div>
 
         <div class="form-actions">
@@ -137,7 +141,7 @@ import { CircleCheck, Save, Plug, Eraser, Plus, Pen, Trash2 } from 'lucide-vue-n
 import GlassCard from '@/components/base/GlassCard.vue'
 import SoftButton from '@/components/base/SoftButton.vue'
 import SoftTag from '@/components/base/SoftTag.vue'
-import { AI_PROVIDERS } from '@/utils/aiConfig'
+import { AI_PROVIDERS, modelLabelOf } from '@/utils/aiConfig'
 import { withViewTransition } from '@/utils/viewTransition'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useExamStore } from '@/stores/exam'
