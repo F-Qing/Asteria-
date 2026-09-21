@@ -310,8 +310,8 @@ const themes: { key: ThemeMode; name: string; desc: string }[] = [
 ]
 
 /* ── 关于 ── */
-/** GitHub 仓库地址（占位符：确定后填入，设置页自动变为可点击链接） */
-const GITHUB_URL = ''
+/** GitHub 仓库地址（设置页自动渲染为可点击链接） */
+const GITHUB_URL = 'https://github.com/F-Qing/Asteria-'
 </script>
 
 <style scoped>
