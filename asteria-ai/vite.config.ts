@@ -19,9 +19,11 @@ export default defineConfig({
     }
   },
   build: {
-    /* 每次构建前清空 outDir。默认值虽然是 true，但实测这里没生效：
-       旧 chunk 一直累积（dist 里堆了 400 多个没人引用的历史版本），显式写死最稳。
-       注意：清空只影响 dist，不会碰别的目录。 */
+    /* 正常终端里这行够用，但它不是保险：实测在受限执行环境（AI 沙箱等拦截删除的环境）里，
+       Node 的 fs.rmSync 会「不报错也删不掉」，Vite 的 emptyDir 遍历一圈等于没删，
+       旧 chunk 原地留着（实测 dist 从 459 个文件涨到 488，assets 里同时存在两代
+       SettingView-*.js / *.css）。所以清空提前到了 build 脚本第一步
+       scripts/clean-dist.mjs：自校验 + 回退系统命令，删不掉就报错退出。 */
     emptyOutDir: true,
     rollupOptions: {
       output: {

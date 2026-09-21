@@ -126,7 +126,6 @@
       </div>
       <div class="about-row">
         <span class="text-sub">GitHub</span>
-        <!-- TODO: GitHub 仓库地址确定后替换 GITHUB_URL 占位符 -->
         <a v-if="GITHUB_URL" :href="GITHUB_URL" target="_blank" rel="noopener">{{ GITHUB_URL }}</a>
         <span v-else class="text-muted">待补充</span>
       </div>
